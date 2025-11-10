@@ -1,4 +1,4 @@
-# 🚀 ORBIT LIVE TEAM - Complete Guide
+# 🚀 ORBIT LIVE TEAM - Complete Guide (Public)
 
 <div align="center">
 
