@@ -831,21 +831,21 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
           <p className="mb-4">© 2025 ORBIT LIVE TEAM. All rights reserved.</p>
           <div className="flex items-center justify-center space-x-6 text-sm">
             <motion.a
-              href="#"
+              href="/privacy-policy"
               className="hover:text-white transition-colors"
               whileHover={{ scale: 1.1, y: -2 }}
             >
               Privacy Policy
             </motion.a>
             <motion.a
-              href="#"
+              href="/terms-and-conditions"
               className="hover:text-white transition-colors"
               whileHover={{ scale: 1.1, y: -2 }}
             >
               Terms of Service
             </motion.a>
             <motion.a
-              href="#"
+              href="mailto:support@orbitlive.team"
               className="hover:text-white transition-colors"
               whileHover={{ scale: 1.1, y: -2 }}
             >

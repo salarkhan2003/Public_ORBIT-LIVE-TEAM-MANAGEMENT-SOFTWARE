@@ -7,6 +7,8 @@ import { ProfileSetup } from './components/Auth/ProfileSetup';
 import { GroupJoin } from './components/Group/GroupJoin';
 import { AuthCallback } from './pages/AuthCallback';
 import { LandingPage } from './pages/LandingPage';
+import { TermsAndConditions } from './pages/TermsAndConditions';
+import { PrivacyPolicy } from './pages/PrivacyPolicy';
 import { useAuth } from './hooks/useAuth';
 import { useGroup } from './hooks/useGroup';
 import { Dashboard } from './pages/Dashboard';
@@ -61,14 +63,26 @@ function App() {
   // User not logged in - show landing page or login
   if (!user) {
     return (
-      <>
-        {showLanding ? (
-          <LandingPage onGetStarted={() => setShowLanding(false)} />
-        ) : (
-          <LoginForm onBackToLanding={() => setShowLanding(true)} />
-        )}
+      <Router>
+        <Routes>
+          {/* Public routes */}
+          <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route
+            path="*"
+            element={
+              <>
+                {showLanding ? (
+                  <LandingPage onGetStarted={() => setShowLanding(false)} />
+                ) : (
+                  <LoginForm onBackToLanding={() => setShowLanding(true)} />
+                )}
+              </>
+            }
+          />
+        </Routes>
         <Toaster position="top-right" />
-      </>
+      </Router>
     );
   }
 
