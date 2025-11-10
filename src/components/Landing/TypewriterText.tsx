@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface TypewriterTextProps {
   texts: string[];
@@ -10,8 +10,8 @@ interface TypewriterTextProps {
 
 export function TypewriterText({
   texts,
-  typingSpeed = 100,
-  deletingSpeed = 50,
+  typingSpeed = 120, // Slightly slower for smoother appearance
+  deletingSpeed = 60,
   pauseDuration = 2000,
   className = ''
 }: TypewriterTextProps) {
@@ -19,21 +19,27 @@ export function TypewriterText({
   const [textIndex, setTextIndex] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
+    // Clear any existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
     if (isPaused) {
-      const pauseTimeout = setTimeout(() => {
+      timeoutRef.current = setTimeout(() => {
         setIsPaused(false);
         setIsDeleting(true);
       }, pauseDuration);
-      return () => clearTimeout(pauseTimeout);
+      return;
     }
 
     const currentText = texts[textIndex];
     const shouldDelete = isDeleting;
     const speed = shouldDelete ? deletingSpeed : typingSpeed;
 
-    const timeout = setTimeout(() => {
+    timeoutRef.current = setTimeout(() => {
       if (!shouldDelete) {
         // Typing
         if (displayText.length < currentText.length) {
@@ -49,12 +55,16 @@ export function TypewriterText({
         } else {
           // Finished deleting, move to next text
           setIsDeleting(false);
-          setTextIndex((prevIndex) => (prevIndex + 1) % texts.length);
+          setTextIndex((prev) => (prev + 1) % texts.length);
         }
       }
     }, speed);
 
-    return () => clearTimeout(timeout);
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
   }, [displayText, textIndex, isDeleting, isPaused, texts, typingSpeed, deletingSpeed, pauseDuration]);
 
   return (
@@ -64,4 +74,3 @@ export function TypewriterText({
     </span>
   );
 }
-

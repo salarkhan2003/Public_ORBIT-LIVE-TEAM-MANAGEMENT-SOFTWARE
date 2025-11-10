@@ -41,8 +41,8 @@ export function TrustIndicators() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.5 }}
           className="mb-16"
         >
           <h3 className="text-center text-sm font-semibold text-gray-400 uppercase tracking-wider mb-8">
@@ -56,8 +56,8 @@ export function TrustIndicators() {
                   key={badge.title}
                   initial={{ opacity: 0, scale: 0.9 }}
                   whileInView={{ opacity: 1, scale: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: index * 0.1 }}
+                  viewport={{ once: true, amount: 0.5 }}
+                  transition={{ delay: index * 0.08, duration: 0.3 }}
                   whileHover={{ scale: 1.05, y: -5 }}
                   className="flex flex-col items-center text-center p-4 bg-white/5 rounded-xl border border-white/10 hover:border-blue-500/50 transition-all"
                 >
@@ -76,8 +76,8 @@ export function TrustIndicators() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
+          viewport={{ once: true, amount: 0.5 }}
+          transition={{ duration: 0.5 }}
         >
           <h3 className="text-center text-sm font-semibold text-gray-400 uppercase tracking-wider mb-8">
             Trusted by Leading Teams Worldwide
@@ -88,8 +88,8 @@ export function TrustIndicators() {
                 key={logo.name}
                 initial={{ opacity: 0, scale: 0.9 }}
                 whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.05 }}
+                viewport={{ once: true, amount: 0.8 }}
+                transition={{ delay: index * 0.05, duration: 0.2 }}
                 whileHover={{ scale: 1.1 }}
                 className="opacity-50 hover:opacity-100 transition-opacity cursor-pointer"
               >
@@ -107,4 +107,3 @@ export function TrustIndicators() {
     </section>
   );
 }
-

@@ -20,18 +20,20 @@ export function CountUp({
   const [count, setCount] = useState(start);
   const [hasAnimated, setHasAnimated] = useState(false);
   const countRef = useRef<HTMLSpanElement>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
 
   useEffect(() => {
-    if (hasAnimated) return;
+    if (hasAnimated || !countRef.current) return;
 
-    const observer = new IntersectionObserver(
+    observerRef.current = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
+        if (entries[0].isIntersecting && !hasAnimated) {
           setHasAnimated(true);
 
           const startTime = Date.now();
           const startValue = start;
           const endValue = end;
+          let animationFrameId: number;
 
           const animate = () => {
             const currentTime = Date.now();
@@ -45,34 +47,26 @@ export function CountUp({
             setCount(currentCount);
 
             if (progress < 1) {
-              requestAnimationFrame(animate);
+              animationFrameId = requestAnimationFrame(animate);
             } else {
               setCount(endValue);
             }
           };
 
-          requestAnimationFrame(animate);
-          observer.disconnect();
+          animationFrameId = requestAnimationFrame(animate);
+
+          // Cleanup function
+          return () => {
+            if (animationFrameId) {
+              cancelAnimationFrame(animationFrameId);
+            }
+          };
         }
       },
-      { threshold: 0.5 }
+      {
+        threshold: 0.5,
+        rootMargin: '0px'
+      }
     );
 
-    if (countRef.current) {
-      observer.observe(countRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, [end, duration, start, hasAnimated]);
-
-  const displayValue = decimals > 0
-    ? count.toFixed(decimals)
-    : Math.floor(count).toLocaleString();
-
-  return (
-    <span ref={countRef}>
-      {prefix}{displayValue}{suffix}
-    </span>
-  );
-}
-
+    i

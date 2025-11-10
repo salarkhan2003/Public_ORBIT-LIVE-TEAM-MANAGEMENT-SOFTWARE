@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, HelpCircle } from 'lucide-react';
 
@@ -45,9 +45,9 @@ const faqData: FAQItem[] = [
 export function FAQ() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
-  const toggleFAQ = (index: number) => {
-    setOpenIndex(openIndex === index ? null : index);
-  };
+  const toggleFAQ = useCallback((index: number) => {
+    setOpenIndex(prev => prev === index ? null : index);
+  }, []);
 
   return (
     <section className="relative z-10 px-6 py-20 bg-gradient-to-b from-transparent via-gray-900/50 to-transparent">
@@ -55,8 +55,8 @@ export function FAQ() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.6 }}
+          viewport={{ once: true, margin: "-100px", amount: 0.3 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
           className="text-center mb-16"
         >
           <div className="inline-flex items-center space-x-2 mb-4">
@@ -75,33 +75,34 @@ export function FAQ() {
           {faqData.map((faq, index) => (
             <motion.div
               key={index}
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 10 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: index * 0.1 }}
+              viewport={{ once: true, amount: 0.5 }}
+              transition={{ delay: index * 0.05, duration: 0.3, ease: "easeOut" }}
               className="bg-gradient-to-br from-white/5 to-white/0 border border-white/10 rounded-2xl overflow-hidden hover:border-blue-500/50 transition-all duration-300"
             >
               <button
                 onClick={() => toggleFAQ(index)}
                 className="w-full px-6 py-5 flex items-center justify-between text-left hover:bg-white/5 transition-colors"
+                aria-expanded={openIndex === index}
               >
                 <span className="text-lg font-semibold pr-8">{faq.question}</span>
                 <motion.div
                   animate={{ rotate: openIndex === index ? 180 : 0 }}
-                  transition={{ duration: 0.3 }}
+                  transition={{ duration: 0.2, ease: "easeInOut" }}
                   className="flex-shrink-0"
                 >
                   <ChevronDown className="w-6 h-6 text-blue-400" />
                 </motion.div>
               </button>
 
-              <AnimatePresence>
+              <AnimatePresence initial={false}>
                 {openIndex === index && (
                   <motion.div
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: "auto", opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.3 }}
+                    transition={{ duration: 0.2, ease: "easeInOut" }}
                     className="overflow-hidden"
                   >
                     <div className="px-6 pb-5 text-gray-300 leading-relaxed">
@@ -117,13 +118,15 @@ export function FAQ() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
+          viewport={{ once: true, amount: 0.8 }}
+          transition={{ duration: 0.4 }}
           className="text-center mt-12"
         >
           <p className="text-gray-400 mb-4">Still have questions?</p>
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
+            transition={{ duration: 0.15 }}
             className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl font-semibold hover:shadow-lg hover:shadow-blue-500/50 transition-all"
           >
             Contact Support
@@ -133,4 +136,3 @@ export function FAQ() {
     </section>
   );
 }
-
