@@ -69,4 +69,22 @@ export function CountUp({
       }
     );
 
-    i
+    if (countRef.current) {
+      observerRef.current.observe(countRef.current);
+    }
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, [end, duration, start, hasAnimated]);
+
+  return (
+    <span ref={countRef} className="tabular-nums">
+      {prefix}
+      {count.toFixed(decimals)}
+      {suffix}
+    </span>
+  );
+}
