@@ -1,72 +1,78 @@
-
-              <div className="text-center p-4 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
-                <div className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent mb-2">
-                  <CountUp end={10} duration={2000} suffix="K+" />
-                </div>
-                <div className="text-sm text-gray-400">Active Teams</div>
-              </div>
-
-              <div className="text-center p-4 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
-                <div className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent mb-2">
-                  <CountUp end={99.9} duration={2000} decimals={1} suffix="%" />
-                </div>
-                <div className="text-sm text-gray-400">Uptime</div>
-              </div>
-
-              <div className="text-center p-4 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
-                <div className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent mb-2">
-                  <CountUp end={4.9} duration={2000} decimals={1} suffix="/5" />
-                </div>
-                <div className="text-sm text-gray-400">User Rating</div>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </div>
-    </motion.section>
-  );
-});
-
-HeroSection.displayName = 'HeroSection';
-
-import React, { useState, useEffect, memo, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
+import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
+import {
+  ArrowRight,
+  Zap,
+  Users,
+  BarChart3,
+  Clock,
   Shield,
   Sparkles,
   Star,
   Rocket,
   Globe,
-  // Detect mobile
+  Smartphone,
   Cloud,
   MessageSquare,
   Calendar,
   CheckCircle2
 } from 'lucide-react';
-    window.addEventListener('resize', checkMobile, { passive: true });
+import { TypewriterText } from '../components/Landing/TypewriterText';
+import { AnimatedParticles } from '../components/Landing/AnimatedParticles';
+import { FloatingShapes } from '../components/Landing/FloatingShapes';
 import { CountUp } from '../components/Landing/CountUp';
 import { ScrollProgressBar } from '../components/Landing/ScrollProgressBar';
 import { BackToTop } from '../components/Landing/BackToTop';
-  // Simplified mouse parallax
+import { FAQ } from '../components/Landing/FAQ';
 import { TrustIndicators } from '../components/Landing/TrustIndicators';
 
+interface LandingPageProps {
   onGetStarted: () => void;
 }
-        x: (e.clientX / window.innerWidth - 0.5) * 5,
-        y: (e.clientY / window.innerHeight - 0.5) * 5,
-const HeroSection = memo(({ onGetStarted, mousePosition, isMobile }: any) => {
-  return (
-    <motion.section
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.4 }}
-      className="relative z-10 px-6 py-12 lg:py-20"
-    >
-      <div className="max-w-7xl mx-auto relative">
-        <div className="text-center max-w-4xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-          >
+
+export function LandingPage({ onGetStarted }: LandingPageProps) {
+  const { scrollYProgress } = useScroll();
+  const smoothProgress = useSpring(scrollYProgress, { stiffness: 100, damping: 30 });
+  const opacity = useTransform(scrollYProgress, [0, 0.2], [1, 0]);
+  const scale = useTransform(scrollYProgress, [0, 0.2], [1, 0.95]);
+  const heroY = useTransform(smoothProgress, [0, 1], [0, -200]);
+  const backgroundY = useTransform(smoothProgress, [0, 1], [0, 300]);
+
+  const [currentFeature, setCurrentFeature] = useState(0);
+  const [usdPricing, setUsdPricing] = useState(true);
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile and disable mouse parallax
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Mouse parallax effect - only on desktop
+  useEffect(() => {
+    if (isMobile) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      setMousePosition({
+        x: (e.clientX / window.innerWidth - 0.5) * 10, // Reduced from 20 to 10
+        y: (e.clientY / window.innerHeight - 0.5) * 10,
+      });
+    };
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, [isMobile]);
+
+  const features = [
+    { icon: Zap, title: 'AI-Powered Automation', description: 'Smart task assignment & workflow optimization' },
+    { icon: Users, title: 'Real-Time Collaboration', description: 'Work together seamlessly with live updates' },
+    { icon: BarChart3, title: 'Advanced Analytics', description: 'Data-driven insights for better decisions' },
+    { icon: Clock, title: 'Smart Time Tracking', description: 'Automatic time logs & productivity metrics' },
+    { icon: Shield, title: 'Enterprise Security', description: 'Bank-grade encryption & compliance' },
     { icon: Globe, title: 'Global Accessibility', description: 'Access from anywhere, any device' },
   ];
 
@@ -74,9 +80,26 @@ const HeroSection = memo(({ onGetStarted, mousePosition, isMobile }: any) => {
     {
       name: 'Starter',
       description: 'Perfect for small teams getting started',
-  const handleGetStarted = useCallback(() => {
-    onGetStarted();
-  }, [onGetStarted]);
+      priceUSD: 9,
+      priceINR: 749,
+      period: 'per user/month',
+      showPrice: true,
+      features: [
+        'Up to 10 team members',
+        '50 projects',
+        '10GB storage',
+        'Basic AI assistance',
+        'Real-time collaboration',
+        'Mobile apps',
+        'Email support',
+        '99.9% uptime SLA'
+      ],
+      popular: false,
+      color: 'from-blue-500 to-cyan-500'
+    },
+    {
+      name: 'Professional',
+      description: 'Best for growing teams and businesses',
       priceUSD: 19,
       priceINR: 1599,
       period: 'per user/month',
@@ -86,12 +109,16 @@ const HeroSection = memo(({ onGetStarted, mousePosition, isMobile }: any) => {
         'Unlimited projects',
         '100GB storage',
         'Advanced AI features',
-      {/* Simplified background - remove heavy animations */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10"></div>
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10"></div>
-        <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10"></div>
-      </div>
+        'Priority support',
+        'Custom workflows',
+        'Advanced analytics',
+        'API access',
+        'Integrations',
+        'Video calls'
+      ],
+      popular: true,
+      color: 'from-purple-500 to-pink-500'
+    },
     {
       name: 'Enterprise',
       description: 'For large organizations with custom needs',
@@ -138,8 +165,158 @@ const HeroSection = memo(({ onGetStarted, mousePosition, isMobile }: any) => {
     },
     {
       name: 'Emily Rodriguez',
-      {/* Hero Section */}
-      <HeroSection onGetStarted={handleGetStarted} mousePosition={mousePosition} isMobile={isMobile} />
+      role: 'Design Lead, Creative Co',
+      image: '👩‍🎨',
+      text: 'Beautiful interface, powerful features. Our team was up and running in minutes, not days.'
+    }
+  ];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentFeature((prev) => (prev + 1) % features.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Scroll reveal animation variants
+  const fadeInUp = {
+    hidden: { opacity: 0, y: 60 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] }
+    }
+  };
+
+  const staggerContainer = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        delayChildren: 0.2
+      }
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white overflow-hidden">
+      {/* Scroll Progress Bar */}
+      <ScrollProgressBar />
+
+      {/* Back to Top Button */}
+      <BackToTop />
+
+      {/* Animated background with parallax */}
+      <motion.div
+        style={{ y: backgroundY }}
+        className="absolute inset-0 overflow-hidden pointer-events-none"
+      >
+        <FloatingShapes shapeCount={6} color="#4F46E5" />
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob"></div>
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob animation-delay-2000"></div>
+        <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob animation-delay-4000"></div>
+      </motion.div>
+
+      {/* Navigation */}
+      <nav className="relative z-50 px-6 py-4 lg:px-12 lg:py-6">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="flex items-center space-x-3"
+          >
+            <motion.div
+              className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-xl overflow-hidden bg-white"
+              whileHover={{ scale: 1.1, rotate: 5 }}
+              transition={{ type: "spring", stiffness: 400, damping: 10 }}
+            >
+              <img src="/logo.png" alt="ORBIT LIVE TEAM" className="w-full h-full object-contain" />
+            </motion.div>
+            <div>
+              <h1 className="text-xl lg:text-2xl font-bold">ORBIT LIVE TEAM</h1>
+              <p className="text-xs text-gray-400 hidden sm:block">AI-Powered Team Management</p>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="flex items-center space-x-4"
+          >
+            <a href="#pricing" className="hidden md:block text-sm text-gray-300 hover:text-white transition-colors">
+              Pricing
+            </a>
+            <a href="#features" className="hidden md:block text-sm text-gray-300 hover:text-white transition-colors">
+              Features
+            </a>
+            <motion.button
+              onClick={onGetStarted}
+              whileHover={{ scale: 1.05, boxShadow: "0 0 30px rgba(79, 70, 229, 0.5)" }}
+              whileTap={{ scale: 0.95 }}
+              className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl font-semibold text-sm hover:shadow-lg hover:shadow-blue-500/50 transition-all duration-300 flex items-center space-x-2"
+            >
+              <span>Get Started</span>
+              <ArrowRight className="w-4 h-4" />
+            </motion.button>
+          </motion.div>
+        </div>
+      </nav>
+
+      {/* Hero Section with Particles and Typewriter */}
+      <motion.section
+        style={{ opacity, scale, y: heroY }}
+        className="relative z-10 px-6 py-12 lg:py-20"
+      >
+        {/* Animated Particles Background */}
+        <div className="absolute inset-0 overflow-hidden">
+          <AnimatedParticles particleCount={50} color="#4F46E5" />
+        </div>
+
+        <div className="max-w-7xl mx-auto relative">
+          <div className="text-center max-w-4xl mx-auto">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              style={{
+                transform: `translate(${mousePosition.x}px, ${mousePosition.y}px)`
+              }}
+            >
+              <motion.div
+                className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-500/20 border border-blue-500/30 rounded-full mb-6"
+                animate={{
+                  boxShadow: ["0 0 0 0 rgba(79, 70, 229, 0)", "0 0 0 10px rgba(79, 70, 229, 0)", "0 0 0 0 rgba(79, 70, 229, 0)"]
+                }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                <Sparkles className="w-4 h-4 text-blue-400" />
+                <span className="text-sm text-blue-300">Trusted by 10,000+ teams worldwide</span>
+              </motion.div>
+
+              <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight">
+                Transform Your Team's
+                <br />
+                <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                  Productivity Forever
+                </span>
+              </h1>
+
+              {/* Typewriter Effect */}
+              <div className="text-2xl md:text-3xl text-gray-300 mb-8 h-20 flex items-center justify-center">
+                <TypewriterText
+                  texts={[
+                    'AI-powered collaboration 🤖',
+                    'Boost productivity by 300% 📈',
+                    'Real-time team sync ⚡',
+                    'Smart workflow automation 🎯'
+                  ]}
+                  typingSpeed={80}
+                  deletingSpeed={40}
+                  pauseDuration={2000}
+                  className="font-semibold bg-gradient-to-r from-blue-300 to-purple-300 bg-clip-text text-transparent"
+                />
+              </div>
 
               <p className="text-xl md:text-2xl text-gray-400 mb-8 max-w-2xl mx-auto">
                 AI-powered workspace that helps teams collaborate in real-time and achieve more together.
