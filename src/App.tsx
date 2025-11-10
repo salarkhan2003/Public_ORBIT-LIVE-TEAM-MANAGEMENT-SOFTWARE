@@ -6,6 +6,7 @@ import { LoginForm } from './components/Auth/LoginForm';
 import { ProfileSetup } from './components/Auth/ProfileSetup';
 import { GroupJoin } from './components/Group/GroupJoin';
 import { AuthCallback } from './pages/AuthCallback';
+import { LandingPage } from './pages/LandingPage';
 import { useAuth } from './hooks/useAuth';
 import { useGroup } from './hooks/useGroup';
 import { Dashboard } from './pages/Dashboard';
@@ -23,6 +24,7 @@ function App() {
   const { user, loading: authLoading } = useAuth();
   const { currentGroup, loading: groupLoading } = useGroup(!authLoading);
   const [showProfileSetup, setShowProfileSetup] = React.useState(false);
+  const [showLanding, setShowLanding] = React.useState(true);
 
   // Add console logging to debug
   React.useEffect(() => {
@@ -34,6 +36,13 @@ function App() {
     if (user && !user.title && !user.position) {
       // User signed in but hasn't completed profile - show setup
       setShowProfileSetup(true);
+    }
+  }, [user]);
+
+  // If user is authenticated, don't show landing page
+  React.useEffect(() => {
+    if (user) {
+      setShowLanding(false);
     }
   }, [user]);
 
@@ -49,11 +58,15 @@ function App() {
     );
   }
 
-  // User not logged in - show login
+  // User not logged in - show landing page or login
   if (!user) {
     return (
       <>
-        <LoginForm />
+        {showLanding ? (
+          <LandingPage onGetStarted={() => setShowLanding(false)} />
+        ) : (
+          <LoginForm onBackToLanding={() => setShowLanding(true)} />
+        )}
         <Toaster position="top-right" />
       </>
     );

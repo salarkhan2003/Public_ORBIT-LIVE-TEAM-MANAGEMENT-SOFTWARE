@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, Bot, Zap, Users, BarChart3, Clock, Shield, Sparkles, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff, Zap, Users, BarChart3, Clock, Shield, Sparkles, CheckCircle2, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -44,7 +44,11 @@ const features = [
 	},
 ];
 
-export function LoginForm() {
+interface LoginFormProps {
+  onBackToLanding?: () => void;
+}
+
+export function LoginForm({ onBackToLanding }: LoginFormProps) {
 	const [isLogin, setIsLogin] = useState(true);
 	const [showPassword, setShowPassword] = useState(false);
 	const [formData, setFormData] = useState({
@@ -156,17 +160,30 @@ export function LoginForm() {
 				<div className="absolute top-40 left-40 w-80 h-80 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
 			</div>
 
+			{/* Back to Landing Button */}
+			{onBackToLanding && (
+				<div className="absolute top-6 right-6 z-50 lg:left-6 lg:right-auto">
+					<button
+						onClick={onBackToLanding}
+						className="flex items-center space-x-2 px-4 py-2.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white hover:bg-white/20 transition-all shadow-lg hover:shadow-xl"
+					>
+						<ArrowLeft className="w-4 h-4" />
+						<span className="text-sm font-medium">Back to Home</span>
+					</button>
+				</div>
+			)}
+
 			<div className="relative min-h-screen flex">
 				{/* Left side - Features showcase */}
-				<div className="hidden lg:flex lg:w-1/2 xl:w-3/5 flex-col justify-center px-12 xl:px-20">
+				<div className="hidden lg:flex lg:w-1/2 xl:w-3/5 flex-col justify-center px-12 xl:px-20 pt-20">
 					<motion.div
 						initial={{ opacity: 0, x: -50 }}
 						animate={{ opacity: 1, x: 0 }}
 						transition={{ duration: 0.8 }}
 					>
-						<div className="flex items-center space-x-3 mb-8">
-							<div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-2xl">
-								<Bot className="w-7 h-7 text-white" />
+						<div className="flex items-center space-x-3 mb-8 mt-8">
+							<div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-2xl overflow-hidden bg-white p-1">
+								<img src="/logo.png" alt="ORBIT LIVE TEAM" className="w-full h-full object-contain" />
 							</div>
 							<div>
 								<h1 className="text-3xl font-bold text-white">ORBIT LIVE TEAM</h1>
@@ -240,10 +257,10 @@ export function LoginForm() {
 						className="w-full max-w-md"
 					>
 						{/* Mobile logo */}
-						<div className="lg:hidden text-center mb-8">
+						<div className="lg:hidden text-center mb-8 mt-12">
 							<div className="inline-flex items-center space-x-3 mb-4">
-								<div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-2xl">
-									<Bot className="w-6 h-6 text-white" />
+								<div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-2xl overflow-hidden bg-white">
+									<img src="/logo.png" alt="ORBIT LIVE TEAM" className="w-full h-full object-contain" />
 								</div>
 								<div className="text-left">
 									<h1 className="text-2xl font-bold text-white">ORBIT LIVE TEAM</h1>
