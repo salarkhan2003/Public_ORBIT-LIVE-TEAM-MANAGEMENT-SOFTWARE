@@ -1,8 +1,9 @@
+import React, { memo } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Shield, Lock, Eye, Database, Users, Bell, Globe } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-export function PrivacyPolicy() {
+export const PrivacyPolicy = memo(() => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
       {/* Header */}
@@ -17,9 +18,9 @@ export function PrivacyPolicy() {
 
       {/* Hero Section */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
         className="max-w-5xl mx-auto px-6 py-16"
       >
         <div className="flex items-center justify-center mb-6">
@@ -33,14 +34,9 @@ export function PrivacyPolicy() {
         <p className="text-sm text-gray-500 text-center">Last Updated: November 10, 2025</p>
       </motion.div>
 
-      {/* Content */}
+      {/* Content - Remove heavy animations */}
       <div className="max-w-5xl mx-auto px-6 pb-20">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2, duration: 0.6 }}
-          className="space-y-12"
-        >
+        <div className="space-y-12">
           {/* Introduction */}
           <section className="bg-blue-500/10 border border-blue-500/30 rounded-2xl p-6">
             <div className="flex items-start space-x-3">
@@ -376,9 +372,10 @@ export function PrivacyPolicy() {
               </Link>
             </div>
           </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );
-}
+});
 
+PrivacyPolicy.displayName = 'PrivacyPolicy';
