@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Bell, Check, CheckCheck, Trash2, Filter, Search, AlertCircle, Info, AlertTriangle, CheckCircle } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Bell, Check, CheckCheck, Trash2, Search, AlertCircle, Info, AlertTriangle, CheckCircle, Sparkles } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Notification } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
 import { format, formatDistanceToNow } from 'date-fns';
+import { motion } from 'framer-motion';
 
 export function Notifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -13,6 +14,26 @@ export function Notifications() {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const { user } = useAuth();
+
+  const fetchNotifications = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setNotifications(data || []);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      toast.error('Failed to load notifications');
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (user) {
@@ -38,27 +59,7 @@ export function Notifications() {
         subscription.unsubscribe();
       };
     }
-  }, [user]);
-
-  const fetchNotifications = async () => {
-    if (!user) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setNotifications(data || []);
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
-      toast.error('Failed to load notifications');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [user, fetchNotifications]);
 
   const markAsRead = async (notificationId: string) => {
     try {
@@ -176,33 +177,67 @@ export function Notifications() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center">
-            <Bell className="w-7 h-7 mr-3" />
-            Notifications
-            {unreadCount > 0 && (
-              <span className="ml-2 px-2 py-1 text-xs bg-red-500 text-white rounded-full">
-                {unreadCount}
-              </span>
-            )}
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Stay updated with your team activities
-          </p>
+    <div className="space-y-6 p-6">
+      {/* Ultra-Modern Hero Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative bg-gradient-to-br from-orange-600 via-red-600 to-pink-600 rounded-3xl p-8 overflow-hidden shadow-2xl"
+      >
+        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="absolute -right-20 -top-20 w-64 h-64 bg-yellow-400/20 rounded-full blur-3xl"></div>
+        <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-pink-400/20 rounded-full blur-3xl"></div>
+
+        <div className="relative z-10 flex items-center justify-between">
+          <div>
+            <motion.h1
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="text-4xl font-black text-white mb-2 tracking-tight flex items-center space-x-3"
+            >
+              <Bell className="w-10 h-10" />
+              <span>Notifications</span>
+              {unreadCount > 0 && (
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="px-4 py-2 text-lg bg-yellow-400 text-gray-900 rounded-2xl font-black shadow-lg"
+                >
+                  {unreadCount} New
+                </motion.span>
+              )}
+            </motion.h1>
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 }}
+              className="flex items-center space-x-6 text-white/90 text-lg font-medium"
+            >
+              <div className="flex items-center space-x-2">
+                <Sparkles className="w-5 h-5 text-yellow-300" />
+                <span>{notifications.length} Total Notifications</span>
+              </div>
+              <div className="w-1 h-6 bg-white/30"></div>
+              <div className="flex items-center space-x-2">
+                <CheckCircle className="w-5 h-5 text-green-300" />
+                <span>{notifications.length - unreadCount} Read</span>
+              </div>
+            </motion.div>
+          </div>
+
+          {unreadCount > 0 && (
+            <motion.button
+              onClick={markAllAsRead}
+              whileHover={{ scale: 1.05, rotate: 2 }}
+              whileTap={{ scale: 0.95 }}
+              className="flex items-center space-x-2 px-8 py-4 bg-white text-orange-600 rounded-2xl hover:bg-orange-50 transition-all shadow-xl font-bold text-lg"
+            >
+              <CheckCheck className="w-6 h-6" />
+              <span>Mark All Read</span>
+            </motion.button>
+          )}
         </div>
-        
-        {unreadCount > 0 && (
-          <button
-            onClick={markAllAsRead}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors"
-          >
-            <CheckCheck className="w-4 h-4" />
-            <span>Mark All Read</span>
-          </button>
-        )}
-      </div>
+      </motion.div>
 
       {/* Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">

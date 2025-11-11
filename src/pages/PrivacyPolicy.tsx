@@ -24,7 +24,7 @@ export const PrivacyPolicy = memo(() => {
         className="max-w-5xl mx-auto px-6 py-16"
       >
         <div className="flex items-center justify-center mb-6">
-          <div className="p-4 bg-gradient-to-br from-blue-500 to-purple-500 rounded-2xl">
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-500">
             <Shield className="w-12 h-12" />
           </div>
         </div>

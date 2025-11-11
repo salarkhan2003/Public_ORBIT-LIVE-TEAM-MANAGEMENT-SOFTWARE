@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
 import {
   ArrowRight,
@@ -25,12 +25,14 @@ import { ScrollProgressBar } from '../components/Landing/ScrollProgressBar';
 import { BackToTop } from '../components/Landing/BackToTop';
 import { FAQ } from '../components/Landing/FAQ';
 import { TrustIndicators } from '../components/Landing/TrustIndicators';
+import { useTheme } from '../hooks/useTheme';
 
 interface LandingPageProps {
   onGetStarted: () => void;
 }
 
-export function LandingPage({ onGetStarted }: LandingPageProps) {
+export const LandingPage = memo(function LandingPage({ onGetStarted }: LandingPageProps) {
+  const { isDark } = useTheme();
   const { scrollYProgress } = useScroll();
   const smoothProgress = useSpring(scrollYProgress, { stiffness: 100, damping: 30 });
   const opacity = useTransform(scrollYProgress, [0, 0.2], [1, 0]);
@@ -200,7 +202,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white overflow-hidden transition-colors duration-700">
       {/* Scroll Progress Bar */}
       <ScrollProgressBar />
 
@@ -212,10 +214,9 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
         style={{ y: backgroundY }}
         className="absolute inset-0 overflow-hidden pointer-events-none"
       >
-        <FloatingShapes shapeCount={6} color="#4F46E5" />
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob"></div>
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob animation-delay-2000"></div>
-        <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob animation-delay-4000"></div>
+        <FloatingShapes shapeCount={5} color="#4F46E5" />
+        <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob" style={{ background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.15), transparent)' }}></div>
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob animation-delay-2000" style={{ background: 'radial-gradient(circle at 70% 70%, rgba(255,255,255,0.15), transparent)' }}></div>
       </motion.div>
 
       {/* Navigation */}
@@ -270,7 +271,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
       >
         {/* Animated Particles Background */}
         <div className="absolute inset-0 overflow-hidden">
-          <AnimatedParticles particleCount={50} color="#4F46E5" />
+          <AnimatedParticles particleCount={30} color="#4F46E5" />
         </div>
 
         <div className="max-w-7xl mx-auto relative">
@@ -887,4 +888,4 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
       `}</style>
     </div>
   );
-}
+});

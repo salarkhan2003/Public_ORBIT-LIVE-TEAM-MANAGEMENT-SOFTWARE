@@ -1,17 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, User, Bell, Shield, Palette, Globe, Save, Eye, EyeOff } from 'lucide-react';
+import { Settings as SettingsIcon, User, Bell, Shield, Palette, Globe, Save, Eye, EyeOff, LogOut, Users as UsersIcon } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { UserSettings, User as UserType } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../hooks/useTheme';
+import { useGroup } from '../hooks/useGroup';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 
 export function Settings() {
-  const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'privacy' | 'appearance'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'privacy' | 'appearance' | 'workspace'>('profile');
   const [loading, setLoading] = useState(false);
   const [settings, setSettings] = useState<Record<string, any>>({});
   const [profileData, setProfileData] = useState<Partial<UserType>>({});
   const [showPassword, setShowPassword] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -19,6 +22,8 @@ export function Settings() {
   });
   const { user } = useAuth();
   const { isDark, toggleTheme } = useTheme();
+  const { currentGroup, leaveGroup, refreshGroup } = useGroup();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (user) {
@@ -126,15 +131,33 @@ export function Settings() {
     }
   };
 
+  const handleExitWorkspace = async () => {
+    try {
+      setLoading(true);
+      await leaveGroup();
+      toast.success('Successfully left workspace');
+      setShowExitConfirm(false);
+      // Refresh to show group join screen
+      await refreshGroup();
+      navigate('/');
+    } catch (error) {
+      console.error('Error leaving workspace:', error);
+      toast.error('Failed to leave workspace');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
+    { id: 'workspace', label: 'Workspace', icon: UsersIcon },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'privacy', label: 'Privacy', icon: Shield },
     { id: 'appearance', label: 'Appearance', icon: Palette },
   ] as const;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center">
           <SettingsIcon className="w-7 h-7 mr-3" />
@@ -154,7 +177,7 @@ export function Settings() {
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => setActiveTab(tab.id as any)}
                   className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                     activeTab === tab.id
                       ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
@@ -361,6 +384,68 @@ export function Settings() {
                       <span>{loading ? 'Saving...' : 'Save Changes'}</span>
                     </button>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Workspace Settings */}
+            {activeTab === 'workspace' && (
+              <div className="p-6">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
+                  Workspace Settings
+                </h2>
+                
+                <div className="space-y-6">
+                  {currentGroup && (
+                    <>
+                      <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-xl p-6 border border-blue-200 dark:border-blue-700">
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+                          Current Workspace
+                        </h3>
+                        <div className="space-y-3">
+                          <div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Workspace Name</p>
+                            <p className="text-xl font-bold text-gray-900 dark:text-white">{currentGroup.name}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Description</p>
+                            <p className="text-gray-900 dark:text-white">{currentGroup.description || 'No description'}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Join Code</p>
+                            <code className="text-2xl font-black text-blue-600 dark:text-blue-400 tracking-wider">
+                              {currentGroup.join_code}
+                            </code>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+                        <h3 className="text-lg font-medium text-red-600 dark:text-red-400 mb-4">
+                          Danger Zone
+                        </h3>
+                        <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-6 border border-red-200 dark:border-red-800">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h4 className="text-md font-semibold text-gray-900 dark:text-white mb-2">
+                                Exit Workspace
+                              </h4>
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                                Leave this workspace. You'll need a new join code to rejoin. Your data will remain but you'll lose access.
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setShowExitConfirm(true)}
+                            className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2 font-semibold"
+                          >
+                            <LogOut className="w-4 h-4" />
+                            <span>Exit Workspace</span>
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -635,6 +720,36 @@ export function Settings() {
           </div>
         </div>
       </div>
+
+      {/* Exit Workspace Confirmation Modal */}
+      {showExitConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+              Exit Workspace?
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              Are you sure you want to leave "{currentGroup?.name}"? You'll need the join code to rejoin later.
+            </p>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowExitConfirm(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExitWorkspace}
+                disabled={loading}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+              >
+                {loading ? 'Exiting...' : 'Exit Workspace'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

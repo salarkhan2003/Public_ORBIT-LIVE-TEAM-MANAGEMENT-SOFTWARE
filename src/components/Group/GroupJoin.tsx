@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Users, Plus, ArrowRight, Copy, Check, Sparkles } from 'lucide-react';
 import { useGroup } from '../../hooks/useGroup';
 import toast from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
 
 export function GroupJoin() {
   const [isCreating, setIsCreating] = useState(false);
@@ -13,7 +12,6 @@ export function GroupJoin() {
   const [createdGroup, setCreatedGroup] = useState<any>(null);
   const [copied, setCopied] = useState(false);
   const { joinGroup, createGroup } = useGroup();
-  const navigate = useNavigate();
 
   const handleJoinGroup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,10 +21,14 @@ export function GroupJoin() {
     try {
       await joinGroup(joinCode.toUpperCase());
       toast.success('Successfully joined workspace!');
-      navigate('/dashboard');
+
+      // Add a small delay to ensure state updates propagate
+      setTimeout(() => {
+        // Force a full page reload to ensure all hooks re-initialize with new group
+        window.location.href = '/dashboard';
+      }, 500);
     } catch (error: any) {
       toast.error(error.message || 'Failed to join group');
-    } finally {
       setLoading(false);
     }
   };

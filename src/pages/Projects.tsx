@@ -1,20 +1,51 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, MoreHorizontal, Calendar, Users, Target, Edit, Trash2, Eye } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Plus, Search, MoreHorizontal, Calendar, Users, Target, Edit, Trash2, Eye, CheckCircle, PlayCircle, PauseCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { Project, User } from '../types';
+import { Project, Group, GroupMember, User } from '../types';
 import { useGroup } from '../hooks/useGroup';
 import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import { motion } from 'framer-motion';
+
+// Extended Project type with creator relation
+interface ProjectWithCreator extends Project {
+  creator?: User;
+}
 
 export function Projects() {
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<ProjectWithCreator[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [viewingProject, setViewingProject] = useState<Project | null>(null);
+  const [deletingProject, setDeletingProject] = useState<Project | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const { currentGroup, groupMembers } = useGroup();
-  const { user } = useAuth();
+
+  const fetchProjects = useCallback(async () => {
+    if (!currentGroup) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select(`
+          *,
+          creator:created_by(id, name, avatar)
+        `)
+        .eq('group_id', currentGroup.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setProjects(data || []);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      toast.error('Failed to load projects');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentGroup]);
 
   useEffect(() => {
     if (currentGroup) {
@@ -40,30 +71,7 @@ export function Projects() {
         subscription.unsubscribe();
       };
     }
-  }, [currentGroup]);
-
-  const fetchProjects = async () => {
-    if (!currentGroup) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('projects')
-        .select(`
-          *,
-          creator:created_by(id, name, avatar)
-        `)
-        .eq('group_id', currentGroup.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setProjects(data || []);
-    } catch (error) {
-      console.error('Error fetching projects:', error);
-      toast.error('Failed to load projects');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [currentGroup, fetchProjects]);
 
   const filteredProjects = projects.filter(project => {
     const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -93,6 +101,64 @@ export function Projects() {
     return 'bg-red-600';
   };
 
+  const updateProjectStatus = async (projectId: string, newStatus: Project['status']) => {
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .update({ status: newStatus })
+        .eq('id', projectId);
+
+      if (error) throw error;
+      
+      setProjects(prev => prev.map(project => 
+        project.id === projectId ? { ...project, status: newStatus } : project
+      ));
+      
+      toast.success('Project status updated');
+    } catch (error) {
+      console.error('Error updating project:', error);
+      toast.error('Failed to update project');
+    }
+  };
+
+  const updateProjectProgress = async (projectId: string, newProgress: number) => {
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .update({ progress: newProgress })
+        .eq('id', projectId);
+
+      if (error) throw error;
+      
+      setProjects(prev => prev.map(project => 
+        project.id === projectId ? { ...project, progress: newProgress } : project
+      ));
+      
+      toast.success('Progress updated');
+    } catch (error) {
+      console.error('Error updating progress:', error);
+      toast.error('Failed to update progress');
+    }
+  };
+
+  const deleteProject = async (projectId: string) => {
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', projectId);
+
+      if (error) throw error;
+      
+      setProjects(prev => prev.filter(p => p.id !== projectId));
+      setDeletingProject(null);
+      toast.success('Project deleted');
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      toast.error('Failed to delete project');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -102,22 +168,29 @@ export function Projects() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 p-6">
+      {/* Enhanced Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center justify-between"
+      >
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Projects</h1>
+          <h1 className="text-3xl font-black text-gray-900 dark:text-white">Projects 🎯</h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Manage and track team projects
+            Manage and track {projects.length} team projects
           </p>
         </div>
-        <button
+        <motion.button
           onClick={() => setShowCreateModal(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white px-6 py-3 rounded-xl flex items-center space-x-2 hover:from-blue-700 hover:to-cyan-700 transition-all shadow-lg font-semibold"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-5 h-5" />
           <span>New Project</span>
-        </button>
-      </div>
+        </motion.button>
+      </motion.div>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
@@ -144,22 +217,63 @@ export function Projects() {
         </select>
       </div>
 
-      {/* Projects Grid */}
+      {/* Projects Grid with Enhanced Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredProjects.map((project) => (
-          <div key={project.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow">
+        {filteredProjects.map((project, index) => (
+          <motion.div
+            key={project.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.1 }}
+            whileHover={{ scale: 1.02, y: -5 }}
+            className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 hover:shadow-2xl transition-all"
+          >
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
                   {project.name}
                 </h3>
-                <span className={`px-2 py-1 text-xs rounded-full font-medium ${getStatusColor(project.status)}`}>
-                  {project.status.replace('_', ' ')}
+                <span className={`px-3 py-1 text-xs rounded-full font-bold ${getStatusColor(project.status)}`}>
+                  {project.status.replace('_', ' ').toUpperCase()}
                 </span>
               </div>
-              <button className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
-                <MoreHorizontal className="w-4 h-4 text-gray-500" />
-              </button>
+              <div className="relative group">
+                <button className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+                  <MoreHorizontal className="w-5 h-5 text-gray-500" />
+                </button>
+                
+                {/* Dropdown Menu */}
+                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                  <button
+                    onClick={() => setEditingProject(project)}
+                    className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-t-xl"
+                  >
+                    <Edit className="w-4 h-4" />
+                    <span>Edit Project</span>
+                  </button>
+                  <button
+                    onClick={() => updateProjectStatus(project.id, project.status === 'active' ? 'on_hold' : 'active')}
+                    className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
+                    {project.status === 'active' ? <PauseCircle className="w-4 h-4" /> : <PlayCircle className="w-4 h-4" />}
+                    <span>{project.status === 'active' ? 'Pause' : 'Resume'}</span>
+                  </button>
+                  <button
+                    onClick={() => updateProjectStatus(project.id, 'completed')}
+                    className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-green-700 dark:text-green-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    <span>Mark Complete</span>
+                  </button>
+                  <button
+                    onClick={() => setDeletingProject(project)}
+                    className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-b-xl"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Delete</span>
+                  </button>
+                </div>
+              </div>
             </div>
             
             {project.description && (
@@ -198,17 +312,32 @@ export function Projects() {
               </div>
             </div>
             
-            {/* Progress */}
+            {/* Enhanced Progress with Controls */}
             <div className="space-y-2 mb-4">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600 dark:text-gray-400">Progress</span>
-                <span className="text-gray-900 dark:text-white font-medium">{project.progress}%</span>
+                <span className="text-gray-600 dark:text-gray-400 font-medium">Progress</span>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => updateProjectProgress(project.id, Math.max(0, project.progress - 10))}
+                    className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300"
+                  >
+                    -
+                  </button>
+                  <span className="text-gray-900 dark:text-white font-bold min-w-[3rem] text-center">{project.progress}%</span>
+                  <button
+                    onClick={() => updateProjectProgress(project.id, Math.min(100, project.progress + 10))}
+                    className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div 
-                  className={`h-2 rounded-full transition-all duration-300 ${getProgressColor(project.progress)}`}
-                  style={{ width: `${project.progress}%` }}
-                ></div>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${project.progress}%` }}
+                  className={`h-3 rounded-full transition-all duration-500 ${getProgressColor(project.progress)}`}
+                ></motion.div>
               </div>
             </div>
 
@@ -222,16 +351,22 @@ export function Projects() {
 
             {/* Actions */}
             <div className="flex items-center space-x-2 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <button className="flex-1 flex items-center justify-center space-x-2 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors">
+              <button
+                onClick={() => setViewingProject(project)}
+                className="flex-1 flex items-center justify-center space-x-2 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+              >
                 <Eye className="w-4 h-4" />
                 <span>View</span>
               </button>
-              <button className="flex-1 flex items-center justify-center space-x-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors">
+              <button
+                onClick={() => setEditingProject(project)}
+                className="flex-1 flex items-center justify-center space-x-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
                 <Edit className="w-4 h-4" />
                 <span>Edit</span>
               </button>
             </div>
-          </div>
+          </motion.div>
         ))}
 
         {filteredProjects.length === 0 && (
@@ -250,6 +385,38 @@ export function Projects() {
         )}
       </div>
 
+      {/* Delete Confirmation Modal */}
+      {deletingProject && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-md w-full p-6"
+          >
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+              Delete Project?
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              Are you sure you want to delete "{deletingProject.name}"? This action cannot be undone.
+            </p>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setDeletingProject(null)}
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => deleteProject(deletingProject.id)}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors font-semibold"
+              >
+                Delete
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {/* Create Project Modal */}
       {showCreateModal && (
         <CreateProjectModal
@@ -259,6 +426,26 @@ export function Projects() {
           currentGroup={currentGroup}
         />
       )}
+
+      {/* Edit Project Modal */}
+      {editingProject && (
+        <EditProjectModal
+          project={editingProject}
+          onClose={() => setEditingProject(null)}
+          onProjectUpdated={fetchProjects}
+          groupMembers={groupMembers}
+          currentGroup={currentGroup}
+        />
+      )}
+
+      {/* View Project Modal */}
+      {viewingProject && (
+        <ViewProjectModal
+          project={viewingProject}
+          onClose={() => setViewingProject(null)}
+          groupMembers={groupMembers}
+        />
+      )}
     </div>
   );
 }
@@ -266,8 +453,8 @@ export function Projects() {
 interface CreateProjectModalProps {
   onClose: () => void;
   onProjectCreated: () => void;
-  groupMembers: any[];
-  currentGroup: any;
+  groupMembers: GroupMember[];
+  currentGroup: Group | null;
 }
 
 function CreateProjectModal({ onClose, onProjectCreated, groupMembers, currentGroup }: CreateProjectModalProps) {
@@ -276,7 +463,6 @@ function CreateProjectModal({ onClose, onProjectCreated, groupMembers, currentGr
     description: '',
     deadline: '',
     team_members: [] as string[],
-    priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent' | 'emergency',
     status: 'active' as Project['status']
   });
   const [loading, setLoading] = useState(false);
@@ -323,17 +509,6 @@ function CreateProjectModal({ onClose, onProjectCreated, groupMembers, currentGr
     }));
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'emergency': return 'bg-red-600 text-white';
-      case 'urgent': return 'bg-orange-500 text-white';
-      case 'high': return 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-300';
-      case 'medium': return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-300';
-      case 'low': return 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300';
-      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-900/20 dark:text-gray-300';
-    }
-  };
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -367,28 +542,6 @@ function CreateProjectModal({ onClose, onProjectCreated, groupMembers, currentGr
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Priority Level
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {(['low', 'medium', 'high', 'urgent', 'emergency'] as const).map((priority) => (
-                    <button
-                      key={priority}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, priority })}
-                      className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
-                        formData.priority === priority
-                          ? getPriorityColor(priority)
-                          : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                      }`}
-                    >
-                      {priority.charAt(0).toUpperCase() + priority.slice(1)}
-                    </button>
-                  ))}
-                </div>
               </div>
 
               <div>
@@ -471,6 +624,352 @@ function CreateProjectModal({ onClose, onProjectCreated, groupMembers, currentGr
           </form>
         </div>
       </div>
+    </div>
+  );
+}
+
+interface EditProjectModalProps {
+  project: Project;
+  onClose: () => void;
+  onProjectUpdated: () => void;
+  groupMembers: GroupMember[];
+  currentGroup: Group | null;
+}
+
+function EditProjectModal({ project, onClose, onProjectUpdated, groupMembers, currentGroup }: EditProjectModalProps) {
+  const [formData, setFormData] = useState<Project>({
+    ...project,
+    team_members: project.team_members || [],
+  });
+  const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    setFormData({
+      ...project,
+      team_members: project.team_members || [],
+    });
+  }, [project]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !currentGroup) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .update({
+          name: formData.name,
+          description: formData.description,
+          status: formData.status,
+          deadline: formData.deadline || null,
+          team_members: formData.team_members,
+        })
+        .eq('id', project.id);
+
+      if (error) throw error;
+      
+      toast.success('Project updated successfully');
+      onProjectUpdated();
+      onClose();
+    } catch (error) {
+      console.error('Error updating project:', error);
+      toast.error(`Failed to update project: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleTeamMember = (memberId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      team_members: prev.team_members.includes(memberId)
+        ? prev.team_members.filter(id => id !== memberId)
+        : [...prev.team_members, memberId]
+    }));
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
+            Edit Project
+          </h2>
+          
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Project Name
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Deadline (Optional)
+                </label>
+                <input
+                  type="date"
+                  value={formData.deadline}
+                  onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            {/* Team Member Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                Assign Team Members
+              </label>
+              <div className="grid grid-cols-1 gap-3 max-h-48 overflow-y-auto">
+                {groupMembers.map((member) => (
+                  <div
+                    key={member.user_id}
+                    onClick={() => toggleTeamMember(member.user_id)}
+                    className={`flex items-center space-x-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      formData.team_members.includes(member.user_id)
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                        : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={formData.team_members.includes(member.user_id)}
+                      onChange={() => toggleTeamMember(member.user_id)}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <img
+                      src={member.users?.avatar || `https://ui-avatars.com/api/?name=${member.users?.name}&background=3B82F6&color=fff`}
+                      alt={member.users?.name}
+                      className="w-8 h-8 rounded-full"
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        {member.users?.name}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {member.users?.title || member.role}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {formData.team_members.length > 0 && (
+                <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    {formData.team_members.length} team member{formData.team_members.length !== 1 ? 's' : ''} selected
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading || !formData.name.trim()}
+                className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {loading ? 'Updating...' : 'Update Project'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface ViewProjectModalProps {
+  project: ProjectWithCreator;
+  onClose: () => void;
+  groupMembers: GroupMember[];
+}
+
+function ViewProjectModal({ project, onClose, groupMembers }: ViewProjectModalProps) {
+  const getStatusColor = (status: Project['status']) => {
+    switch (status) {
+      case 'active':
+        return 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300';
+      case 'completed':
+        return 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300';
+      case 'on_hold':
+        return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-300';
+      default:
+        return 'bg-gray-100 text-gray-700 dark:bg-gray-900/20 dark:text-gray-300';
+    }
+  };
+
+  const getProgressColor = (progress: number) => {
+    if (progress >= 80) return 'bg-green-600';
+    if (progress >= 50) return 'bg-blue-600';
+    if (progress >= 25) return 'bg-yellow-600';
+    return 'bg-red-600';
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+      >
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+              {project.name}
+            </h2>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="mb-6">
+            <span className={`px-3 py-1 text-xs rounded-full font-bold ${getStatusColor(project.status)}`}>
+              {project.status.replace('_', ' ').toUpperCase()}
+            </span>
+          </div>
+
+          {project.description && (
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                Description
+              </h3>
+              <p className="text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg">
+                {project.description}
+              </p>
+            </div>
+          )}
+
+          {/* Team Members */}
+          <div className="mb-6">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+              Team Members ({project.team_members?.length || 0})
+            </h3>
+            <div className="grid grid-cols-1 gap-2">
+              {project.team_members?.map((memberId, index) => {
+                const member = groupMembers.find(m => m.user_id === memberId);
+                return member?.users ? (
+                  <div key={index} className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                    <img
+                      src={member.users.avatar || `https://ui-avatars.com/api/?name=${member.users.name}&background=3B82F6&color=fff`}
+                      alt={member.users.name}
+                      className="w-10 h-10 rounded-full"
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        {member.users.name}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {member.users?.title || 'Team Member'}
+                      </p>
+                    </div>
+                  </div>
+                ) : null;
+              })}
+              {(!project.team_members || project.team_members.length === 0) && (
+                <p className="text-sm text-gray-500 dark:text-gray-400 italic">No team members assigned</p>
+              )}
+            </div>
+          </div>
+
+          {/* Progress */}
+          <div className="mb-6">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+              Progress
+            </h3>
+            <div className="flex items-center space-x-3">
+              <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-4">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${project.progress}%` }}
+                  transition={{ duration: 0.5 }}
+                  className={`h-4 rounded-full transition-all ${getProgressColor(project.progress)}`}
+                ></motion.div>
+              </div>
+              <span className="text-lg font-bold text-gray-900 dark:text-white min-w-[3rem]">
+                {project.progress}%
+              </span>
+            </div>
+          </div>
+
+          {/* Deadline */}
+          {project.deadline && (
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                Deadline
+              </h3>
+              <div className="flex items-center space-x-2 text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg">
+                <Calendar className="w-5 h-5 text-blue-600" />
+                <span className="font-medium">{format(new Date(project.deadline), 'MMMM dd, yyyy')}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Created By */}
+          {project.creator && (
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                Created By
+              </h3>
+              <div className="flex items-center space-x-3 bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg">
+                <img
+                  src={project.creator.avatar || `https://ui-avatars.com/api/?name=${project.creator.name}&background=3B82F6&color=fff`}
+                  alt={project.creator.name}
+                  className="w-10 h-10 rounded-full"
+                />
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  {project.creator.name}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <button
+              onClick={onClose}
+              className="flex-1 px-4 py-3 text-sm font-semibold rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 }

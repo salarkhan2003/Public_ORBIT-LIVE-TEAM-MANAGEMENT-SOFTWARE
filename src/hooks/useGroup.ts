@@ -17,16 +17,29 @@ export function useGroup(authReady: boolean = true) {
 
     // Wait for auth to be ready before checking group
     if (!authReady) {
-      setLoading(true); // Keep loading while waiting for auth
+      setLoading(true);
       return;
     }
 
     initializedRef.current = true;
     checkUserGroup();
 
+    // Real-time subscription for group changes
+    const subscription = supabase
+      .channel('group-membership-changes')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'group_members' },
+        () => {
+          console.log('Group membership changed, refreshing...');
+          checkUserGroup();
+        }
+      )
+      .subscribe();
+
     return () => {
       console.log('Group cleanup - resetting initialized flag');
-      initializedRef.current = false; // Reset so it can initialize again on remount
+      subscription.unsubscribe();
+      // initializedRef.current = false; // Removed to prevent resetting on re-login
     };
   }, [authReady]);
 
@@ -52,27 +65,30 @@ export function useGroup(authReady: boolean = true) {
           groups (*)
         `)
         .eq('user_id', user.id)
-        .limit(1);
+        .limit(1)
+        .maybeSingle();
 
-      if (error) {
+      if (error && error.code !== 'PGRST116') {
         console.error('Error fetching group membership:', error);
         throw error;
       }
 
       console.log('Group membership data:', membership);
 
-      if (membership && membership.length > 0 && membership[0]?.groups) {
-        const grp = membership[0].groups as Group;
+      if (membership && membership.groups) {
+        const grp = membership.groups as Group;
         console.log('User is member of group:', grp.name);
         setCurrentGroup(grp);
         await fetchGroupMembers(grp.id);
       } else {
         console.log('User is not member of any group');
         setCurrentGroup(null);
+        setGroupMembers([]);
       }
     } catch (error) {
       console.error('Error checking user group:', error);
       setCurrentGroup(null);
+      setGroupMembers([]);
     } finally {
       setLoading(false);
     }
@@ -112,19 +128,18 @@ export function useGroup(authReady: boolean = true) {
       if (groupError || !group) throw new Error('Invalid group code');
 
       // Check if user is already a member of this group
-      const { data: existingMembership, error: membershipError } = await supabase
+      const { data: existingMembership } = await supabase
         .from('group_members')
         .select('*')
         .eq('group_id', (group as any).id)
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (membershipError) throw membershipError;
-
       // If user is already a member, just update state and return
       if (existingMembership) {
         setCurrentGroup(group as Group);
         await fetchGroupMembers((group as any).id);
+        setLoading(false);
         return group;
       }
 
@@ -139,8 +154,12 @@ export function useGroup(authReady: boolean = true) {
 
       if (memberError) throw memberError;
 
+      // Immediately update the state
       setCurrentGroup(group as Group);
       await fetchGroupMembers((group as any).id);
+
+      // Also trigger a full re-check to ensure everything is synchronized
+      await checkUserGroup();
 
       return group;
     } catch (error) {
@@ -151,7 +170,6 @@ export function useGroup(authReady: boolean = true) {
     }
   };
 
-
   const createGroup = async (name: string, description: string) => {
     setLoading(true);
     try {
@@ -159,7 +177,6 @@ export function useGroup(authReady: boolean = true) {
       const user = userResp?.data?.user ?? null;
       if (!user) throw new Error('Not authenticated');
 
-      // Generate a short join code and ensure minimal collision handling could be added later
       const joinCode = Math.random().toString(36).substring(2, 8).toUpperCase();
 
       console.log('Creating group with:', { name, description, joinCode });
@@ -198,11 +215,9 @@ export function useGroup(authReady: boolean = true) {
 
       console.log('Creator added as admin');
 
-      // Update state immediately
       setCurrentGroup(group as Group);
       await fetchGroupMembers((group as any).id);
 
-      console.log('State updated, returning group');
       return group;
     } catch (error) {
       console.error('Error creating group:', error);
@@ -212,13 +227,39 @@ export function useGroup(authReady: boolean = true) {
     }
   };
 
+  const leaveGroup = async () => {
+    try {
+      const userResp = await supabase.auth.getUser();
+      const user = userResp?.data?.user ?? null;
+      if (!user || !currentGroup) throw new Error('Not authenticated or no group');
+
+      // Delete user's membership
+      const { error } = await supabase
+        .from('group_members')
+        .delete()
+        .eq('group_id', currentGroup.id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      // Clear local state
+      setCurrentGroup(null);
+      setGroupMembers([]);
+
+      return true;
+    } catch (error) {
+      console.error('Error leaving group:', error);
+      throw error;
+    }
+  };
+
   return {
     currentGroup,
     groupMembers,
     loading,
     joinGroup,
     createGroup,
+    leaveGroup,
     refreshGroup: checkUserGroup,
-    refreshMembers: () => currentGroup && fetchGroupMembers(currentGroup.id)
   };
 }

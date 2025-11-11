@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar as CalendarIcon, Plus, Clock, MapPin, Users, Video, Edit, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Calendar as CalendarIcon, Plus, Clock, MapPin, Users, Video, Edit, Trash2, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { Meeting, User } from '../types';
+import { Meeting, Group } from '../types';
 import { useGroup } from '../hooks/useGroup';
 import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths, startOfWeek, endOfWeek } from 'date-fns';
+import { motion } from 'framer-motion';
 
 export function Calendar() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
@@ -14,16 +15,10 @@ export function Calendar() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [view, setView] = useState<'month' | 'week' | 'day'>('month');
-  const { currentGroup, groupMembers } = useGroup();
+  const { currentGroup } = useGroup();
   const { user } = useAuth();
 
-  useEffect(() => {
-    if (currentGroup) {
-      fetchMeetings();
-    }
-  }, [currentGroup, currentMonth]);
-
-  const fetchMeetings = async () => {
+  const fetchMeetings = useCallback(async () => {
     if (!currentGroup) return;
 
     try {
@@ -49,7 +44,13 @@ export function Calendar() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentGroup, currentMonth]);
+
+  useEffect(() => {
+    if (currentGroup) {
+      fetchMeetings();
+    }
+  }, [currentGroup, fetchMeetings]);
 
   const getDaysInMonth = () => {
     const start = startOfWeek(startOfMonth(currentMonth));
@@ -87,64 +88,111 @@ export function Calendar() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Calendar</h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Schedule and manage team meetings
-          </p>
-        </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          <span>New Meeting</span>
-        </button>
-      </div>
+    <div className="space-y-6 p-6">
+      {/* Ultra-Modern Hero Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 rounded-3xl p-8 overflow-hidden shadow-2xl"
+      >
+        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="absolute -right-20 -top-20 w-64 h-64 bg-cyan-400/20 rounded-full blur-3xl"></div>
+        <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-purple-400/20 rounded-full blur-3xl"></div>
 
-      {/* Calendar Header */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+        <div className="relative z-10 flex items-center justify-between">
+          <div>
+            <motion.h1
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="text-4xl font-black text-white mb-2 tracking-tight flex items-center space-x-3"
             >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-              {format(currentMonth, 'MMMM yyyy')}
-            </h2>
-            <button
-              onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+              <CalendarIcon className="w-10 h-10" />
+              <span>Team Calendar</span>
+            </motion.h1>
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 }}
+              className="flex items-center space-x-6 text-white/90 text-lg font-medium"
             >
-              <ChevronRight className="w-5 h-5" />
-            </button>
+              <div className="flex items-center space-x-2">
+                <Sparkles className="w-5 h-5 text-yellow-300" />
+                <span>{meetings.length} Meetings</span>
+              </div>
+              <div className="w-1 h-6 bg-white/30"></div>
+              <div className="flex items-center space-x-2">
+                <Clock className="w-5 h-5 text-green-300" />
+                <span>{format(currentMonth, 'MMMM yyyy')}</span>
+              </div>
+            </motion.div>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <button
+          <motion.button
+            onClick={() => setShowCreateModal(true)}
+            whileHover={{ scale: 1.05, rotate: 2 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex items-center space-x-2 px-8 py-4 bg-white text-indigo-600 rounded-2xl hover:bg-indigo-50 transition-all shadow-xl font-bold text-lg"
+          >
+            <Plus className="w-6 h-6" />
+            <span>New Meeting</span>
+          </motion.button>
+        </div>
+      </motion.div>
+
+      {/* Calendar Header */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-lg border border-gray-200/50 dark:border-gray-700/50 p-6"
+      >
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-4">
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+              className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 shadow-lg"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </motion.button>
+            <h2 className="text-2xl font-black text-gray-900 dark:text-white">
+              {format(currentMonth, 'MMMM yyyy')}
+            </h2>
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+              className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 shadow-lg"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </motion.button>
+          </div>
+
+          <div className="flex items-center space-x-3">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={() => setCurrentMonth(new Date())}
-              className="px-3 py-1 text-sm border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
+              className="px-4 py-2 text-sm font-semibold border-2 border-indigo-500 text-indigo-600 dark:text-indigo-400 rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all"
             >
               Today
-            </button>
-            <div className="flex rounded-lg border border-gray-200 dark:border-gray-600">
+            </motion.button>
+            <div className="flex rounded-xl border-2 border-gray-200 dark:border-gray-600 overflow-hidden shadow-sm">
               {(['month', 'week', 'day'] as const).map((viewType) => (
-                <button
+                <motion.button
                   key={viewType}
                   onClick={() => setView(viewType)}
-                  className={`px-3 py-1 text-sm capitalize ${
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={`px-4 py-2 text-sm capitalize font-semibold ${
                     view === viewType
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white'
                       : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
-                  } ${viewType === 'month' ? 'rounded-l-lg' : viewType === 'day' ? 'rounded-r-lg' : ''}`}
+                  }`}
                 >
                   {viewType}
-                </button>
+                </motion.button>
               ))}
             </div>
           </div>
@@ -203,11 +251,16 @@ export function Calendar() {
             );
           })}
         </div>
-      </div>
+      </motion.div>
 
       {/* Selected Date Meetings */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-lg border border-gray-200/50 dark:border-gray-700/50 p-6"
+      >
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
           Meetings for {format(selectedDate, 'EEEE, MMMM d, yyyy')}
         </h3>
 
@@ -293,14 +346,13 @@ export function Calendar() {
             </div>
           )}
         </div>
-      </div>
+      </motion.div>
 
       {/* Create Meeting Modal */}
       {showCreateModal && (
         <CreateMeetingModal
           onClose={() => setShowCreateModal(false)}
           onMeetingCreated={fetchMeetings}
-          groupMembers={groupMembers}
           currentGroup={currentGroup}
           selectedDate={selectedDate}
         />
@@ -312,12 +364,11 @@ export function Calendar() {
 interface CreateMeetingModalProps {
   onClose: () => void;
   onMeetingCreated: () => void;
-  groupMembers: any[];
-  currentGroup: any;
+  currentGroup: Group | null;
   selectedDate: Date;
 }
 
-function CreateMeetingModal({ onClose, onMeetingCreated, groupMembers, currentGroup, selectedDate }: CreateMeetingModalProps) {
+function CreateMeetingModal({ onClose, onMeetingCreated, currentGroup, selectedDate }: CreateMeetingModalProps) {
   const [formData, setFormData] = useState({
     title: '',
     description: '',

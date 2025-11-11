@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bot, Sparkles, TrendingUp, AlertTriangle, Target, Users, Calendar, FileText, RefreshCw } from 'lucide-react';
+import { Bot, Sparkles, TrendingUp, Target, RefreshCw, CheckCircle, Clock } from 'lucide-react';
 import { generateTaskSummary } from '../../lib/gemini';
 import { supabase } from '../../lib/supabase';
 import { useGroup } from '../../hooks/useGroup';
@@ -13,7 +13,7 @@ export function AIInsights() {
     pendingReviews: 0,
     teamEfficiency: 0
   });
-  
+
   const { currentGroup } = useGroup();
 
   useEffect(() => {
@@ -25,7 +25,7 @@ export function AIInsights() {
   const loadInsights = async () => {
     try {
       setLoading(true);
-      
+
       // Fetch real data from database
       const { data: tasks, error: tasksError } = await supabase
         .from('tasks')
@@ -51,14 +51,14 @@ export function AIInsights() {
       const totalTasks = tasks?.length || 0;
       const pendingReviews = tasks?.filter(t => t.status === 'in_progress').length || 0;
       const productivity = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-      
+
       // Calculate team efficiency based on task completion rate
       const recentTasks = tasks?.filter(t => {
         const createdDate = new Date(t.created_at);
         const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
         return createdDate >= weekAgo;
       }) || [];
-      
+
       const recentCompleted = recentTasks.filter(t => t.status === 'done').length;
       const teamEfficiency = recentTasks.length > 0 ? Math.round((recentCompleted / recentTasks.length) * 100) : 0;
 
@@ -149,107 +149,75 @@ Ready to transform your team's productivity? Let's build something incredible to
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="animate-pulse">
-                <div className="p-4 bg-gray-100 dark:bg-gray-700 rounded-lg">
-                  <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-20 mb-2"></div>
-                  <div className="h-6 bg-gray-200 dark:bg-gray-600 rounded w-12"></div>
-                </div>
-              </div>
+              <div key={i} className="animate-pulse bg-gray-200 dark:bg-gray-700 h-20 rounded-lg"></div>
             ))}
           </div>
         </div>
       ) : (
-        <div className="space-y-6">
-          {/* AI Generated Insights */}
-          <div className="prose dark:prose-invert max-w-none">
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg p-4 border-l-4 border-blue-500">
-              <div className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-                {insights}
+        <>
+          {/* Metrics Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-4 rounded-xl border border-blue-200 dark:border-blue-800">
+              <div className="flex items-center justify-between mb-2">
+                <Target className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <span className="text-2xl font-black text-blue-600 dark:text-blue-400">{metrics.productivity}%</span>
               </div>
+              <p className="text-xs font-semibold text-blue-900 dark:text-blue-300">Productivity</p>
             </div>
-          </div>
-          
-          {/* Real-time Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-lg border border-blue-200 dark:border-blue-800">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                    Productivity
-                  </p>
-                  <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-                    {metrics.productivity}%
-                  </p>
-                </div>
-                <TrendingUp className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+
+            <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 p-4 rounded-xl border border-green-200 dark:border-green-800">
+              <div className="flex items-center justify-between mb-2">
+                <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+                <span className="text-2xl font-black text-green-600 dark:text-green-400">{metrics.completedTasks}</span>
               </div>
+              <p className="text-xs font-semibold text-green-900 dark:text-green-300">Completed</p>
             </div>
-            
-            <div className="p-4 bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-lg border border-green-200 dark:border-green-800">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-green-700 dark:text-green-300">
-                    Tasks Done
-                  </p>
-                  <p className="text-2xl font-bold text-green-900 dark:text-green-100">
-                    {metrics.completedTasks}
-                  </p>
-                </div>
-                <Target className="w-8 h-8 text-green-600 dark:text-green-400" />
+
+            <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20 p-4 rounded-xl border border-yellow-200 dark:border-yellow-800">
+              <div className="flex items-center justify-between mb-2">
+                <Clock className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                <span className="text-2xl font-black text-yellow-600 dark:text-yellow-400">{metrics.pendingReviews}</span>
               </div>
+              <p className="text-xs font-semibold text-yellow-900 dark:text-yellow-300">In Progress</p>
             </div>
-            
-            <div className="p-4 bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-lg border border-orange-200 dark:border-orange-800">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-orange-700 dark:text-orange-300">
-                    In Progress
-                  </p>
-                  <p className="text-2xl font-bold text-orange-900 dark:text-orange-100">
-                    {metrics.pendingReviews}
-                  </p>
-                </div>
-                <AlertTriangle className="w-8 h-8 text-orange-600 dark:text-orange-400" />
+
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 p-4 rounded-xl border border-purple-200 dark:border-purple-800">
+              <div className="flex items-center justify-between mb-2">
+                <TrendingUp className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                <span className="text-2xl font-black text-purple-600 dark:text-purple-400">{metrics.teamEfficiency}%</span>
               </div>
-            </div>
-            
-            <div className="p-4 bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-lg border border-purple-200 dark:border-purple-800">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-purple-700 dark:text-purple-300">
-                    Team Efficiency
-                  </p>
-                  <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
-                    {metrics.teamEfficiency}%
-                  </p>
-                </div>
-                <Users className="w-8 h-8 text-purple-600 dark:text-purple-400" />
-              </div>
+              <p className="text-xs font-semibold text-purple-900 dark:text-purple-300">Efficiency</p>
             </div>
           </div>
 
-          {/* Quick Actions */}
-          <div className="flex flex-wrap gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <button
-              onClick={loadInsights}
-              disabled={loading}
-              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm disabled:opacity-50"
-            >
-              <Bot className="w-4 h-4" />
-              <span>Refresh Insights</span>
-            </button>
-            
-            <button className="flex items-center space-x-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm">
-              <FileText className="w-4 h-4" />
-              <span>Generate Report</span>
-            </button>
-            
-            <button className="flex items-center space-x-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm">
-              <Calendar className="w-4 h-4" />
-              <span>Schedule Review</span>
-            </button>
+          {/* Scrollable Insights Content - Reduced Height */}
+          <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/50 dark:to-gray-800/50 rounded-xl p-4 border border-gray-200 dark:border-gray-700 max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-gray-100 dark:scrollbar-track-gray-800">
+            <div className="prose prose-sm dark:prose-invert max-w-none">
+              {insights.split('\n').map((line, index) => {
+                if (line.startsWith('**') && line.endsWith('**')) {
+                  return (
+                    <h4 key={index} className="text-sm font-bold text-gray-900 dark:text-white mt-3 mb-2">
+                      {line.replace(/\*\*/g, '')}
+                    </h4>
+                  );
+                } else if (line.startsWith('🚀') || line.startsWith('📊') || line.startsWith('⚡')) {
+                  return (
+                    <p key={index} className="text-lg font-bold text-blue-600 dark:text-blue-400 my-2">
+                      {line}
+                    </p>
+                  );
+                } else if (line.trim()) {
+                  return (
+                    <p key={index} className="text-xs text-gray-700 dark:text-gray-300 mb-1">
+                      {line}
+                    </p>
+                  );
+                }
+                return null;
+              })}
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

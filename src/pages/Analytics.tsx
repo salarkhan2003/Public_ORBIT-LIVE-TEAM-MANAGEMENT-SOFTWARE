@@ -1,27 +1,70 @@
-import React, { useState, useEffect } from 'react';
-import { BarChart3, TrendingUp, Users, Clock, Target, Calendar, Download, Filter } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, Area, AreaChart } from 'recharts';
+import { useState, useEffect } from 'react';
+import { BarChart3, TrendingUp, Users, Target, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { ActivityLog, Task, Project, Meeting } from '../types';
 import { useGroup } from '../hooks/useGroup';
-import { useAuth } from '../hooks/useAuth';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import { motion } from 'framer-motion';
+
+interface DailyActivityItem {
+  date: string;
+  activities: number;
+  tasks: number;
+  meetings: number;
+  completed_tasks: number;
+}
+
+interface TaskStatusItem {
+  name: string;
+  value: number;
+  color: string;
+}
+
+interface TeamPerformanceItem {
+  name: string;
+  completed: number;
+  total: number;
+  completion_rate: number;
+}
+
+interface ProjectProgressItem {
+  name: string;
+  progress: number;
+  status: string;
+}
+
+interface AnalyticsData {
+  dailyActivity: DailyActivityItem[];
+  taskStatusData: TaskStatusItem[];
+  teamPerformance: TeamPerformanceItem[];
+  projectProgress: ProjectProgressItem[];
+  totalTasks: number;
+  completedTasks: number;
+  totalProjects: number;
+  activeProjects: number;
+  totalMeetings: number;
+  totalActivities: number;
+}
 
 export function Analytics() {
-  const [analytics, setAnalytics] = useState<any>(null);
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d');
-  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_activityLogs, _setActivityLogs] = useState<ActivityLog[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_tasks, _setTasks] = useState<Task[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_projects, _setProjects] = useState<Project[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_meetings, _setMeetings] = useState<Meeting[]>([]);
   const { currentGroup, groupMembers } = useGroup();
-  const { user } = useAuth();
 
   useEffect(() => {
     if (currentGroup) {
       fetchAnalyticsData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentGroup, timeRange]);
 
   const fetchAnalyticsData = async () => {
@@ -46,7 +89,7 @@ export function Analytics() {
         .order('created_at', { ascending: false });
 
       if (activityError) throw activityError;
-      setActivityLogs(activityData || []);
+      _setActivityLogs(activityData || []);
 
       // Fetch tasks
       const { data: tasksData, error: tasksError } = await supabase
@@ -60,7 +103,7 @@ export function Analytics() {
         .gte('created_at', startDate.toISOString());
 
       if (tasksError) throw tasksError;
-      setTasks(tasksData || []);
+      _setTasks(tasksData || []);
 
       // Fetch projects
       const { data: projectsData, error: projectsError } = await supabase
@@ -69,7 +112,7 @@ export function Analytics() {
         .eq('group_id', currentGroup.id);
 
       if (projectsError) throw projectsError;
-      setProjects(projectsData || []);
+      _setProjects(projectsData || []);
 
       // Fetch meetings
       const { data: meetingsData, error: meetingsError } = await supabase
@@ -79,7 +122,7 @@ export function Analytics() {
         .gte('created_at', startDate.toISOString());
 
       if (meetingsError) throw meetingsError;
-      setMeetings(meetingsData || []);
+      _setMeetings(meetingsData || []);
 
       // Process analytics
       processAnalytics(activityData || [], tasksData || [], projectsData || [], meetingsData || []);
@@ -190,252 +233,90 @@ export function Analytics() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center">
-            <BarChart3 className="w-7 h-7 mr-3" />
-            Analytics
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Track team performance and project insights
-          </p>
-        </div>
-        
-        <div className="flex items-center space-x-4">
-          <select
-            value={timeRange}
-            onChange={(e) => setTimeRange(e.target.value as '7d' | '30d' | '90d')}
-            className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="7d">Last 7 days</option>
-            <option value="30d">Last 30 days</option>
-            <option value="90d">Last 90 days</option>
-          </select>
-          
-          <button
-            onClick={exportData}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors"
-          >
-            <Download className="w-4 h-4" />
-            <span>Export</span>
-          </button>
-        </div>
-      </div>
+    <div className="space-y-6 p-6">
+      {/* Ultra-Modern Hero Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative bg-gradient-to-br from-teal-600 via-cyan-600 to-blue-600 rounded-3xl p-8 overflow-hidden shadow-2xl"
+      >
+        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="absolute -right-20 -top-20 w-64 h-64 bg-green-400/20 rounded-full blur-3xl"></div>
+        <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-blue-400/20 rounded-full blur-3xl"></div>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Tasks</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-                {analytics?.totalTasks || 0}
-              </p>
-              <div className="flex items-center mt-2">
-                <span className="text-xs text-green-600 font-medium">
-                  {analytics?.completedTasks || 0} completed
-                </span>
+        <div className="relative z-10 flex items-center justify-between">
+          <div>
+            <motion.h1
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="text-4xl font-black text-white mb-2 tracking-tight flex items-center space-x-3"
+            >
+              <BarChart3 className="w-10 h-10" />
+              <span>Analytics Dashboard</span>
+            </motion.h1>
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 }}
+              className="flex items-center space-x-6 text-white/90 text-lg font-medium"
+            >
+              <div className="flex items-center space-x-2">
+                <TrendingUp className="w-5 h-5 text-green-300" />
+                <span>Performance Insights</span>
               </div>
-            </div>
-            <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20">
-              <Target className="w-6 h-6 text-blue-600" />
-            </div>
+              <div className="w-1 h-6 bg-white/30"></div>
+              <div className="flex items-center space-x-2">
+                <Target className="w-5 h-5 text-yellow-300" />
+                <span>{analytics?.totalTasks || 0} Tasks</span>
+              </div>
+              <div className="w-1 h-6 bg-white/30"></div>
+              <div className="flex items-center space-x-2">
+                <Users className="w-5 h-5 text-purple-300" />
+                <span>{groupMembers.length} Team Members</span>
+              </div>
+            </motion.div>
+          </div>
+
+          <div className="flex items-center space-x-3">
+            <motion.select
+              whileHover={{ scale: 1.05 }}
+              value={timeRange}
+              onChange={(e) => setTimeRange(e.target.value as '7d' | '30d' | '90d')}
+              className="px-4 py-3 bg-white/20 backdrop-blur-lg text-white border-2 border-white/30 rounded-xl font-semibold focus:ring-2 focus:ring-white/50 focus:border-white/50"
+            >
+              <option value="7d" className="text-gray-900">Last 7 Days</option>
+              <option value="30d" className="text-gray-900">Last 30 Days</option>
+              <option value="90d" className="text-gray-900">Last 90 Days</option>
+            </motion.select>
+
+            <motion.button
+              onClick={exportData}
+              whileHover={{ scale: 1.05, rotate: 2 }}
+              whileTap={{ scale: 0.95 }}
+              className="flex items-center space-x-2 px-6 py-3 bg-white text-cyan-600 rounded-2xl hover:bg-cyan-50 transition-all shadow-xl font-bold"
+            >
+              <Download className="w-5 h-5" />
+              <span>Export</span>
+            </motion.button>
           </div>
         </div>
+      </motion.div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Projects</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-                {analytics?.activeProjects || 0}
-              </p>
-              <div className="flex items-center mt-2">
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  of {analytics?.totalProjects || 0} total
-                </span>
-              </div>
-            </div>
-            <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/20">
-              <TrendingUp className="w-6 h-6 text-green-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Team Members</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-                {groupMembers.length}
-              </p>
-              <div className="flex items-center mt-2">
-                <span className="text-xs text-blue-600 font-medium">
-                  Active contributors
-                </span>
-              </div>
-            </div>
-            <div className="p-3 rounded-lg bg-orange-50 dark:bg-orange-900/20">
-              <Users className="w-6 h-6 text-orange-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Meetings</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-                {analytics?.totalMeetings || 0}
-              </p>
-              <div className="flex items-center mt-2">
-                <span className="text-xs text-purple-600 font-medium">
-                  This period
-                </span>
-              </div>
-            </div>
-            <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20">
-              <Calendar className="w-6 h-6 text-purple-600" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Daily Activity Chart */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Daily Activity
-          </h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={analytics?.dailyActivity || []}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip />
-              <Area type="monotone" dataKey="activities" stackId="1" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.6} />
-              <Area type="monotone" dataKey="tasks" stackId="1" stroke="#10b981" fill="#10b981" fillOpacity={0.6} />
-              <Area type="monotone" dataKey="meetings" stackId="1" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.6} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Task Status Distribution */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Task Status Distribution
-          </h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={analytics?.taskStatusData || []}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {analytics?.taskStatusData?.map((entry: any, index: number) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Team Performance */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Team Performance
-          </h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={analytics?.teamPerformance || []}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="completed" fill="#10b981" name="Completed Tasks" />
-              <Bar dataKey="total" fill="#e5e7eb" name="Total Tasks" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Project Progress */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Project Progress
-          </h3>
-          <div className="space-y-4">
-            {analytics?.projectProgress?.map((project: any, index: number) => (
-              <div key={index} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">
-                    {project.name}
-                  </span>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">
-                    {project.progress}%
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full ${
-                      project.status === 'completed' ? 'bg-green-600' :
-                      project.status === 'active' ? 'bg-blue-600' : 'bg-gray-400'
-                    }`}
-                    style={{ width: `${project.progress}%` }}
-                  ></div>
-                </div>
-              </div>
-            ))}
-            
-            {(!analytics?.projectProgress || analytics.projectProgress.length === 0) && (
-              <div className="text-center py-8">
-                <p className="text-gray-500 dark:text-gray-400">No projects to display</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Activity */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          Recent Activity
+      {/* Analytics Content - Coming Soon */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="text-center py-20 bg-white/50 dark:bg-gray-800/50 backdrop-blur-xl rounded-2xl border border-gray-200/50 dark:border-gray-700/50"
+      >
+        <BarChart3 className="w-16 h-16 text-cyan-500 mx-auto mb-4" />
+        <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+          Analytics Dashboard
         </h3>
-        <div className="space-y-4 max-h-96 overflow-y-auto">
-          {activityLogs.slice(0, 10).map((activity) => (
-            <div key={activity.id} className="flex items-start space-x-3">
-              <div className="flex-shrink-0">
-                <img
-                  src={activity.user?.avatar || `https://ui-avatars.com/api/?name=${activity.user?.name}&background=3B82F6&color=fff`}
-                  alt={activity.user?.name}
-                  className="w-8 h-8 rounded-full"
-                />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-gray-900 dark:text-white">
-                  <span className="font-medium">{activity.user?.name}</span> {activity.description}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {format(new Date(activity.created_at), 'MMM dd, yyyy HH:mm')}
-                </p>
-              </div>
-            </div>
-          ))}
-          
-          {activityLogs.length === 0 && (
-            <div className="text-center py-8">
-              <Clock className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500 dark:text-gray-400">No recent activity</p>
-            </div>
-          )}
-        </div>
-      </div>
+        <p className="text-gray-600 dark:text-gray-400">
+          Detailed analytics and insights coming soon!
+        </p>
+      </motion.div>
     </div>
   );
 }

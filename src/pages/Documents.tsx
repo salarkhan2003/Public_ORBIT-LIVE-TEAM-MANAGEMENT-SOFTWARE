@@ -1,257 +1,263 @@
-import React, { useState, useEffect } from 'react';
-import { Upload, Search, Filter, Download, Eye, Trash2, FileText, Image, Video, Archive, Plus, FolderOpen, File, Tag } from 'lucide-react';
-import { useDropzone } from 'react-dropzone';
+import { useState, useEffect, useCallback } from 'react';
+import { Upload, Search, Download, Trash2, FileText, Image, Video, Archive, File, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { FileUpload, Project, Task } from '../types';
 import { useGroup } from '../hooks/useGroup';
 import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import { motion } from 'framer-motion';
+
+interface Document {
+  id: string;
+  title: string;
+  description?: string;
+  file_name: string;
+  file_path: string;
+  file_size: number;
+  file_type: string;
+  group_id: string;
+  uploaded_by: string;
+  folder: string;
+  download_count: number;
+  created_at: string;
+  uploader?: {
+    id: string;
+    name: string;
+    avatar?: string;
+  };
+}
 
 export function Documents() {
-  const [files, setFiles] = useState<FileUpload[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [projectFilter, setProjectFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadTitle, setUploadTitle] = useState('');
+  const [uploadDescription, setUploadDescription] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
   const { currentGroup } = useGroup();
   const { user } = useAuth();
 
-  useEffect(() => {
-    if (currentGroup) {
-      fetchFiles();
-      fetchProjects();
-      fetchTasks();
-      
-      // Set up real-time subscription
-      const subscription = supabase
-        .channel('documents-changes')
-        .on('postgres_changes', 
-          { 
-            event: '*', 
-            schema: 'public', 
-            table: 'file_uploads',
-            filter: `group_id=eq.${currentGroup.id}`
-          }, 
-          () => {
-            fetchFiles();
-          }
-        )
-        .subscribe();
-
-      return () => {
-        subscription.unsubscribe();
-      };
-    }
-  }, [currentGroup]);
-
-  const fetchFiles = async () => {
+  // Fetch documents
+  const fetchDocuments = useCallback(async () => {
     if (!currentGroup) return;
 
     try {
       const { data, error } = await supabase
-        .from('file_uploads')
+        .from('documents')
         .select(`
           *,
-          uploader:uploaded_by(id, name, avatar),
-          project:project_id(id, name)
+          uploader:uploaded_by(id, name, avatar)
         `)
         .eq('group_id', currentGroup.id)
+        .eq('is_archived', false)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setFiles(data || []);
+      setDocuments(data || []);
     } catch (error) {
-      console.error('Error fetching files:', error);
+      console.error('Error fetching documents:', error);
       toast.error('Failed to load documents');
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentGroup]);
 
-  const fetchProjects = async () => {
-    if (!currentGroup) return;
+  useEffect(() => {
+    fetchDocuments();
+  }, [fetchDocuments]);
 
-    try {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('id, name')
-        .eq('group_id', currentGroup.id);
-
-      if (error) throw error;
-      setProjects(data || []);
-    } catch (error) {
-      console.error('Error fetching projects:', error);
+  // Handle file selection
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Check file size (50MB limit)
+      if (file.size > 50 * 1024 * 1024) {
+        toast.error('File size must be less than 50MB');
+        return;
+      }
+      setSelectedFile(file);
+      setUploadTitle(file.name);
+      setShowUploadModal(true);
     }
   };
 
-  const fetchTasks = async () => {
-    if (!currentGroup) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('id, title')
-        .eq('group_id', currentGroup.id);
-
-      if (error) throw error;
-      setTasks(data || []);
-    } catch (error) {
-      console.error('Error fetching tasks:', error);
-    }
-  };
-
-  const onDrop = async (acceptedFiles: File[]) => {
-    if (!user || !currentGroup) return;
+  // Upload file to Supabase Storage
+  const handleUpload = async () => {
+    if (!selectedFile || !currentGroup || !user) return;
 
     setUploading(true);
+    setUploadProgress(0);
+
     try {
-      for (const file of acceptedFiles) {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-        const filePath = `${user.id}/${fileName}`;
+      // Generate unique file path
+      const timestamp = Date.now();
+      const fileName = `${timestamp}_${selectedFile.name}`;
+      const filePath = `${user.id}/${currentGroup.id}/${fileName}`;
 
-        // Upload file to Supabase Storage
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('documents')
-          .upload(filePath, file);
+      // Upload to Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(filePath, selectedFile, {
+          cacheControl: '3600',
+          upsert: false,
+        });
 
-        if (uploadError) {
-          console.error('Upload error:', uploadError);
-          throw new Error(`Failed to upload ${file.name}: ${uploadError.message}`);
-        }
+      if (uploadError) throw uploadError;
 
-        // Get public URL for the uploaded file
-        const { data: urlData } = supabase.storage
-          .from('documents')
-          .getPublicUrl(filePath);
+      setUploadProgress(50);
 
-        // Save file metadata to database
-        const { error: dbError } = await supabase
-          .from('file_uploads')
-          .insert({
-            filename: fileName,
-            original_name: file.name,
-            file_path: filePath,
-            file_size: file.size,
-            mime_type: file.type,
-            uploaded_by: user.id,
-            group_id: currentGroup.id,
-            category: getCategoryFromMimeType(file.type),
-            is_public: false,
-            tags: []
-          });
+      // Save metadata to database
+      const { data: docData, error: docError } = await supabase
+        .from('documents')
+        .insert({
+          title: uploadTitle || selectedFile.name,
+          description: uploadDescription,
+          file_name: selectedFile.name,
+          file_path: uploadData.path,
+          file_size: selectedFile.size,
+          file_type: selectedFile.type || 'application/octet-stream',
+          group_id: currentGroup.id,
+          uploaded_by: user.id,
+          folder: 'root',
+        })
+        .select(`
+          *,
+          uploader:uploaded_by(id, name, avatar)
+        `)
+        .single();
 
-        if (dbError) {
-          console.error('Database error:', dbError);
-          // Try to delete the uploaded file if database insert fails
-          await supabase.storage.from('documents').remove([filePath]);
-          throw new Error(`Failed to save ${file.name} metadata: ${dbError.message}`);
-        }
-      }
+      if (docError) throw docError;
 
-      toast.success(`${acceptedFiles.length} file(s) uploaded successfully`);
-      fetchFiles();
-    } catch (error) {
-      console.error('Error uploading files:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to upload files');
+      setUploadProgress(100);
+
+      // Update local state
+      setDocuments(prev => [docData, ...prev]);
+
+      toast.success('Document uploaded successfully!');
+
+      // Reset form
+      setShowUploadModal(false);
+      setSelectedFile(null);
+      setUploadTitle('');
+      setUploadDescription('');
+      setUploadProgress(0);
+    } catch (error: unknown) {
+      console.error('Upload error:', error);
+      const message = error instanceof Error ? error.message : 'Failed to upload document';
+      toast.error(message);
     } finally {
       setUploading(false);
     }
   };
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    multiple: true,
-    maxSize: 50 * 1024 * 1024, // 50MB
-  });
-
-  const getCategoryFromMimeType = (mimeType: string): FileUpload['category'] => {
-    if (mimeType.startsWith('image/')) return 'media';
-    if (mimeType.startsWith('video/')) return 'media';
-    if (mimeType.includes('pdf') || mimeType.includes('document')) return 'documentation';
-    if (mimeType.includes('zip') || mimeType.includes('archive')) return 'other';
-    return 'other';
-  };
-
-  const getFileIcon = (mimeType: string) => {
-    if (mimeType.startsWith('image/')) return <Image className="w-5 h-5" />;
-    if (mimeType.startsWith('video/')) return <Video className="w-5 h-5" />;
-    if (mimeType.includes('zip') || mimeType.includes('archive')) return <Archive className="w-5 h-5" />;
-    return <FileText className="w-5 h-5" />;
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  const downloadFile = async (file: FileUpload) => {
+  // Download file
+  const handleDownload = async (document: Document) => {
     try {
-      const { data: downloadData, error } = await supabase.storage
+      // Download file from storage
+      const { data, error } = await supabase.storage
         .from('documents')
-        .download(file.file_path);
+        .download(document.file_path);
 
       if (error) throw error;
 
-      const url = URL.createObjectURL(downloadData);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = file.original_name;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      // Create download link
+      const url = URL.createObjectURL(data);
+      const link = window.document.createElement('a');
+      link.href = url;
+      link.download = document.file_name;
+      window.document.body.appendChild(link);
+      link.click();
+      window.document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      
-      toast.success('File downloaded successfully');
-    } catch (error) {
-      console.error('Error downloading file:', error);
-      toast.error(`Failed to download file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+
+      // Increment download count
+      await supabase.rpc('increment_download_count', {
+        document_id: document.id
+      });
+
+      // Update local state
+      setDocuments(prev => prev.map(doc =>
+        doc.id === document.id
+          ? { ...doc, download_count: doc.download_count + 1 }
+          : doc
+      ));
+
+      toast.success('Document downloaded!');
+    } catch (error: unknown) {
+      console.error('Download error:', error);
+      toast.error('Failed to download document');
     }
   };
 
-  const deleteFile = async (file: FileUpload) => {
-    if (!confirm('Are you sure you want to delete this file?')) return;
+  // Delete file
+  const handleDelete = async (document: Document) => {
+    if (!confirm(`Are you sure you want to delete "${document.title}"?`)) return;
 
     try {
       // Delete from storage
       const { error: storageError } = await supabase.storage
         .from('documents')
-        .remove([file.file_path]);
+        .remove([document.file_path]);
 
       if (storageError) throw storageError;
 
       // Delete from database
       const { error: dbError } = await supabase
-        .from('file_uploads')
+        .from('documents')
         .delete()
-        .eq('id', file.id);
+        .eq('id', document.id);
 
       if (dbError) throw dbError;
 
-      toast.success('File deleted successfully');
-      fetchFiles();
-    } catch (error) {
-      console.error('Error deleting file:', error);
-      toast.error('Failed to delete file');
+      // Update local state
+      setDocuments(prev => prev.filter(doc => doc.id !== document.id));
+
+      toast.success('Document deleted successfully!');
+    } catch (error: unknown) {
+      console.error('Delete error:', error);
+      toast.error('Failed to delete document');
     }
   };
 
-  const filteredFiles = files.filter(file => {
-    const matchesSearch = file.original_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         file.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesCategory = categoryFilter === 'all' || file.category === categoryFilter;
-    const matchesProject = projectFilter === 'all' || file.project_id === projectFilter;
-    
-    return matchesSearch && matchesCategory && matchesProject;
+  // Get file icon based on type
+  const getFileIcon = (fileType: string) => {
+    if (fileType.startsWith('image/')) return <Image className="w-8 h-8 text-blue-500" />;
+    if (fileType.startsWith('video/')) return <Video className="w-8 h-8 text-purple-500" />;
+    if (fileType.includes('pdf')) return <FileText className="w-8 h-8 text-red-500" />;
+    if (fileType.includes('zip') || fileType.includes('rar')) return <Archive className="w-8 h-8 text-orange-500" />;
+    return <File className="w-8 h-8 text-gray-500" />;
+  };
+
+  // Format file size
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  };
+
+  // Filter documents
+  const filteredDocuments = documents.filter(doc => {
+    const matchesSearch = doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         doc.file_name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = typeFilter === 'all' || doc.file_type.startsWith(typeFilter);
+    return matchesSearch && matchesType;
   });
+
+
+  // Calculate stats
+  const stats = {
+    total: documents.length,
+    totalSize: documents.reduce((acc, doc) => acc + doc.file_size, 0),
+    images: documents.filter(doc => doc.file_type.startsWith('image/')).length,
+    videos: documents.filter(doc => doc.file_type.startsWith('video/')).length,
+    pdfs: documents.filter(doc => doc.file_type.includes('pdf')).length,
+  };
 
   if (loading) {
     return (
@@ -262,489 +268,294 @@ export function Documents() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Documents</h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Manage and organize team documents
-          </p>
-        </div>
-        <button
-          onClick={() => setShowUploadModal(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Upload Document</span>
-        </button>
-      </div>
-
-      {/* Quick Upload Area */}
-      <div
-        {...getRootProps()}
-        className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
-          isDragActive
-            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-            : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
-        }`}
+    <div className="space-y-6 p-6">
+      {/* Hero Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative bg-gradient-to-br from-purple-600 via-pink-600 to-red-600 rounded-3xl p-8 overflow-hidden shadow-2xl"
       >
-        <input {...getInputProps()} />
-        <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-          {isDragActive ? 'Drop files here' : 'Quick Upload'}
-        </h3>
-        <p className="text-gray-600 dark:text-gray-400">
-          Drag and drop files here, or click to select files
-        </p>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-          Maximum file size: 50MB
-        </p>
-        {uploading && (
-          <div className="mt-4">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="text-sm text-blue-600 mt-2">Uploading...</p>
+        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="relative z-10">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-4xl font-black text-white mb-2">Documents 📁</h1>
+              <p className="text-white/90 text-lg">
+                {stats.total} files • {formatFileSize(stats.totalSize)} total
+              </p>
+            </div>
+
+            <label htmlFor="file-upload">
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="flex items-center space-x-2 px-8 py-4 bg-white text-purple-600 rounded-2xl hover:bg-purple-50 transition-all shadow-xl font-bold text-lg cursor-pointer"
+              >
+                <Upload className="w-6 h-6" />
+                <span>Upload Document</span>
+              </motion.div>
+              <input
+                id="file-upload"
+                type="file"
+                onChange={handleFileSelect}
+                className="hidden"
+                accept="*/*"
+              />
+            </label>
           </div>
-        )}
-      </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white/10 backdrop-blur-lg rounded-xl p-4 border border-white/20">
+              <p className="text-white/70 text-sm">Images</p>
+              <p className="text-2xl font-bold text-white">{stats.images}</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur-lg rounded-xl p-4 border border-white/20">
+              <p className="text-white/70 text-sm">Videos</p>
+              <p className="text-2xl font-bold text-white">{stats.videos}</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur-lg rounded-xl p-4 border border-white/20">
+              <p className="text-white/70 text-sm">PDFs</p>
+              <p className="text-2xl font-bold text-white">{stats.pdfs}</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur-lg rounded-xl p-4 border border-white/20">
+              <p className="text-white/70 text-sm">Storage</p>
+              <p className="text-2xl font-bold text-white">{formatFileSize(stats.totalSize)}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+        <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+      </motion.div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search documents..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 pr-4 py-2 w-full border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-xl rounded-2xl p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg"
+      >
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search documents..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-12 pr-4 py-3 w-full border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all font-medium"
+            />
+          </div>
+
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 font-medium min-w-[150px]"
+          >
+            <option value="all">All Types</option>
+            <option value="image">Images</option>
+            <option value="video">Videos</option>
+            <option value="application/pdf">PDFs</option>
+            <option value="application">Documents</option>
+          </select>
         </div>
-        
-        <select
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-          className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        >
-          <option value="all">All Categories</option>
-          <option value="design">Design</option>
-          <option value="development">Development</option>
-          <option value="documentation">Documentation</option>
-          <option value="media">Media</option>
-          <option value="other">Other</option>
-        </select>
+      </motion.div>
 
-        <select
-          value={projectFilter}
-          onChange={(e) => setProjectFilter(e.target.value)}
-          className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      {/* Documents Grid */}
+      {filteredDocuments.length === 0 ? (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center py-20 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-3xl border-2 border-dashed border-gray-300 dark:border-gray-700"
         >
-          <option value="all">All Projects</option>
-          {projects.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* File Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredFiles.map((file) => (
-          <div key={file.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-400">
-                  {getFileIcon(file.mime_type)}
+          <Upload className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No documents found</h3>
+          <p className="text-gray-600 dark:text-gray-400">Upload your first document to get started!</p>
+        </motion.div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredDocuments.map((document, index) => (
+            <motion.div
+              key={document.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05 }}
+              whileHover={{ scale: 1.02, y: -5 }}
+              className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 hover:shadow-2xl transition-all"
+            >
+              <div className="flex items-start space-x-4 mb-4">
+                <div className="p-3 bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl">
+                  {getFileIcon(document.file_type)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                    {file.original_name}
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white truncate">
+                    {document.title}
                   </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {formatFileSize(file.file_size)}
+                  <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                    {document.file_name}
                   </p>
                 </div>
               </div>
-              
-              <div className="flex items-center space-x-1">
-                <button
-                  onClick={() => downloadFile(file)}
-                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+
+              {document.description && (
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">
+                  {document.description}
+                </p>
+              )}
+
+              <div className="space-y-2 mb-4">
+                <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                  <span>Size: {formatFileSize(document.file_size)}</span>
+                  <span>Downloads: {document.download_count}</span>
+                </div>
+                <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
+                  <img
+                    src={document.uploader?.avatar || `https://ui-avatars.com/api/?name=${document.uploader?.name}&background=random`}
+                    alt={document.uploader?.name}
+                    className="w-5 h-5 rounded-full"
+                  />
+                  <span>{document.uploader?.name}</span>
+                  <span>•</span>
+                  <span>{format(new Date(document.created_at), 'MMM dd, yyyy')}</span>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex space-x-2">
+                <motion.button
+                  onClick={() => handleDownload(document)}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="flex-1 flex items-center justify-center space-x-2 px-3 py-2 text-sm bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:from-blue-600 hover:to-cyan-600 rounded-xl transition-all font-semibold shadow-lg"
                 >
-                  <Download className="w-4 h-4 text-gray-500" />
-                </button>
-                {file.uploaded_by === user?.id && (
-                  <button
-                    onClick={() => deleteFile(file)}
-                    className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                  <Download className="w-4 h-4" />
+                  <span>Download</span>
+                </motion.button>
+
+                {(document.uploaded_by === user?.id) && (
+                  <motion.button
+                    onClick={() => handleDelete(document)}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="p-2 bg-gradient-to-r from-red-500 to-pink-500 text-white hover:from-red-600 hover:to-pink-600 rounded-xl transition-all shadow-lg"
                   >
-                    <Trash2 className="w-4 h-4 text-red-500" />
-                  </button>
+                    <Trash2 className="w-4 h-4" />
+                  </motion.button>
                 )}
               </div>
-            </div>
-
-            <div className="space-y-2 text-xs text-gray-500 dark:text-gray-400">
-              <div className="flex items-center justify-between">
-                <span>Category</span>
-                <span className="capitalize">{file.category}</span>
-              </div>
-              
-              {file.project && (
-                <div className="flex items-center justify-between">
-                  <span>Project</span>
-                  <span>{file.project.name}</span>
-                </div>
-              )}
-              
-              <div className="flex items-center justify-between">
-                <span>Uploaded by</span>
-                <div className="flex items-center space-x-1">
-                  <img
-                    src={file.uploader?.avatar || `https://ui-avatars.com/api/?name=${file.uploader?.name}&background=3B82F6&color=fff&size=16`}
-                    alt={file.uploader?.name}
-                    className="w-4 h-4 rounded-full"
-                  />
-                  <span>{file.uploader?.name}</span>
-                </div>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <span>Date</span>
-                <span>{format(new Date(file.created_at), 'MMM dd, yyyy')}</span>
-              </div>
-            </div>
-
-            {file.tags && file.tags.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                <div className="flex flex-wrap gap-1">
-                  {file.tags.slice(0, 3).map((tag, index) => (
-                    <span
-                      key={index}
-                      className="px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded flex items-center space-x-1"
-                    >
-                      <Tag className="w-3 h-3" />
-                      <span>{tag}</span>
-                    </span>
-                  ))}
-                  {file.tags.length > 3 && (
-                    <span className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded">
-                      +{file.tags.length - 3} more
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
-
-        {filteredFiles.length === 0 && (
-          <div className="col-span-full text-center py-12">
-            <FolderOpen className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              No documents found
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400">
-              {searchTerm || categoryFilter !== 'all' || projectFilter !== 'all'
-                ? 'Try adjusting your filters'
-                : 'Upload your first document to get started'
-              }
-            </p>
-          </div>
-        )}
-      </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
 
       {/* Upload Modal */}
-      {showUploadModal && (
-        <UploadModal
-          onClose={() => setShowUploadModal(false)}
-          onFileUploaded={fetchFiles}
-          projects={projects}
-          tasks={tasks}
-          currentGroup={currentGroup}
-        />
+      {showUploadModal && selectedFile && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-md w-full p-6"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Upload Document</h2>
+              <button
+                onClick={() => {
+                  setShowUploadModal(false);
+                  setSelectedFile(null);
+                  setUploadTitle('');
+                  setUploadDescription('');
+                }}
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border-2 border-purple-200 dark:border-purple-700">
+                <div className="flex items-center space-x-3">
+                  {getFileIcon(selectedFile.type)}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                      {selectedFile.name}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {formatFileSize(selectedFile.size)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  value={uploadTitle}
+                  onChange={(e) => setUploadTitle(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500"
+                  placeholder="Document title..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  Description (Optional)
+                </label>
+                <textarea
+                  value={uploadDescription}
+                  onChange={(e) => setUploadDescription(e.target.value)}
+                  rows={3}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 resize-none"
+                  placeholder="Add a description..."
+                />
+              </div>
+
+              {uploading && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600 dark:text-gray-400">Uploading...</span>
+                    <span className="font-semibold text-purple-600">{uploadProgress}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${uploadProgress}%` }}
+                      className="h-full bg-gradient-to-r from-purple-600 to-pink-600"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex space-x-3 pt-4">
+                <button
+                  onClick={() => {
+                    setShowUploadModal(false);
+                    setSelectedFile(null);
+                    setUploadTitle('');
+                    setUploadDescription('');
+                  }}
+                  disabled={uploading}
+                  className="flex-1 px-4 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-semibold disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleUpload}
+                  disabled={uploading || !uploadTitle.trim()}
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 transition-all font-semibold shadow-lg flex items-center justify-center space-x-2"
+                >
+                  <Upload className="w-5 h-5" />
+                  <span>{uploading ? 'Uploading...' : 'Upload'}</span>
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
       )}
     </div>
   );
 }
 
-interface UploadModalProps {
-  onClose: () => void;
-  onFileUploaded: () => void;
-  projects: Project[];
-  tasks: Task[];
-  currentGroup: any;
-}
-
-function UploadModal({ onClose, onFileUploaded, projects, tasks, currentGroup }: UploadModalProps) {
-  const [files, setFiles] = useState<File[]>([]);
-  const [formData, setFormData] = useState({
-    project_id: '',
-    task_id: '',
-    category: 'other' as FileUpload['category'],
-    description: '',
-    tags: [] as string[],
-    is_public: false
-  });
-  const [tagInput, setTagInput] = useState('');
-  const [uploading, setUploading] = useState(false);
-  const { user } = useAuth();
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop: (acceptedFiles) => setFiles(acceptedFiles),
-    multiple: true,
-    maxSize: 50 * 1024 * 1024,
-  });
-
-  const addTag = () => {
-    if (tagInput.trim() && !formData.tags.includes(tagInput.trim())) {
-      setFormData(prev => ({
-        ...prev,
-        tags: [...prev.tags, tagInput.trim()]
-      }));
-      setTagInput('');
-    }
-  };
-
-  const removeTag = (tagToRemove: string) => {
-    setFormData(prev => ({
-      ...prev,
-      tags: prev.tags.filter(tag => tag !== tagToRemove)
-    }));
-  };
-
-  const handleUpload = async () => {
-    if (!user || !currentGroup || files.length === 0) return;
-
-    setUploading(true);
-    try {
-      for (const file of files) {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-        const filePath = `${user.id}/${fileName}`;
-
-        // Upload file to Supabase Storage
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('documents')
-          .upload(filePath, file);
-
-        if (uploadError) {
-          console.error('Upload error:', uploadError);
-          throw new Error(`Failed to upload ${file.name}: ${uploadError.message}`);
-        }
-
-        // Save file metadata to database
-        const { error: dbError } = await supabase
-          .from('file_uploads')
-          .insert({
-            filename: fileName,
-            original_name: file.name,
-            file_path: filePath,
-            file_size: file.size,
-            mime_type: file.type,
-            uploaded_by: user.id,
-            group_id: currentGroup.id,
-            project_id: formData.project_id || null,
-            category: formData.category,
-            tags: formData.tags,
-            is_public: formData.is_public,
-          });
-
-        if (dbError) {
-          console.error('Database error:', dbError);
-          // Try to delete the uploaded file if database insert fails
-          await supabase.storage.from('documents').remove([filePath]);
-          throw new Error(`Failed to save ${file.name} metadata: ${dbError.message}`);
-        }
-      }
-
-      toast.success(`${files.length} file(s) uploaded successfully`);
-      onFileUploaded();
-      onClose();
-    } catch (error) {
-      console.error('Error uploading files:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to upload files');
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
-            Upload Documents
-          </h2>
-          
-          {/* File Drop Zone */}
-          <div
-            {...getRootProps()}
-            className={`border-2 border-dashed rounded-lg p-6 text-center mb-6 transition-colors ${
-              isDragActive
-                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
-            }`}
-          >
-            <input {...getInputProps()} />
-            <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {isDragActive ? 'Drop files here' : 'Drag and drop files here, or click to select'}
-            </p>
-          </div>
-
-          {/* Selected Files */}
-          {files.length > 0 && (
-            <div className="mb-6">
-              <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
-                Selected Files ({files.length})
-              </h3>
-              <div className="space-y-2 max-h-32 overflow-y-auto">
-                {files.map((file, index) => (
-                  <div key={index} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded">
-                    <div className="flex items-center space-x-2">
-                      <File className="w-4 h-4 text-gray-500" />
-                      <span className="text-sm text-gray-900 dark:text-white">{file.name}</span>
-                    </div>
-                    <button
-                      onClick={() => setFiles(files.filter((_, i) => i !== index))}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Form Fields */}
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Assign to Project (Optional)
-                </label>
-                <select
-                  value={formData.project_id}
-                  onChange={(e) => setFormData({ ...formData, project_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">No project</option>
-                  {projects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Category
-                </label>
-                <select
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value as FileUpload['category'] })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="design">Design</option>
-                  <option value="development">Development</option>
-                  <option value="documentation">Documentation</option>
-                  <option value="media">Media</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Description
-              </label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={3}
-                placeholder="Describe what this document is about..."
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-              />
-            </div>
-
-            {/* Tags */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Tags
-              </label>
-              <div className="flex space-x-2 mb-2">
-                <input
-                  type="text"
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
-                  placeholder="Add a tag..."
-                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-                <button
-                  type="button"
-                  onClick={addTag}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Add
-                </button>
-              </div>
-              {formData.tags.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {formData.tags.map((tag, index) => (
-                    <span
-                      key={index}
-                      className="px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded flex items-center space-x-1"
-                    >
-                      <span>{tag}</span>
-                      <button
-                        onClick={() => removeTag(tag)}
-                        className="text-blue-500 hover:text-blue-700"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Public Toggle */}
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="is_public"
-                checked={formData.is_public}
-                onChange={(e) => setFormData({ ...formData, is_public: e.target.checked })}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label htmlFor="is_public" className="text-sm text-gray-700 dark:text-gray-300">
-                Make this document publicly accessible to all team members
-              </label>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700">
-            <button
-              onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleUpload}
-              disabled={uploading || files.length === 0}
-              className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {uploading ? 'Uploading...' : `Upload ${files.length} file${files.length !== 1 ? 's' : ''}`}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
