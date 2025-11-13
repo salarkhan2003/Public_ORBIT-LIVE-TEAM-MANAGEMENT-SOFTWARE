@@ -3,6 +3,7 @@ import { Bell, Check, CheckCheck, Trash2, Search, AlertCircle, Info, AlertTriang
 import { supabase } from '../lib/supabase';
 import { Notification } from '../types';
 import { useAuth } from '../hooks/useAuth';
+import { LoadingAnimation } from '../components/Shared/LoadingAnimation';
 import toast from 'react-hot-toast';
 import { format, formatDistanceToNow } from 'date-fns';
 import { motion } from 'framer-motion';
@@ -170,8 +171,8 @@ export function Notifications() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <LoadingAnimation variant="wave" size="md" text="Loading Notifications..." />
       </div>
     );
   }

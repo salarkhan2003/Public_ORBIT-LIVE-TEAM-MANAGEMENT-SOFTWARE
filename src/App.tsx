@@ -9,6 +9,7 @@ import { AuthCallback } from './pages/AuthCallback';
 import { LandingPage } from './pages/LandingPage';
 import { TermsAndConditions } from './pages/TermsAndConditions';
 import { PrivacyPolicy } from './pages/PrivacyPolicy';
+import { FullPageLoader } from './components/Shared/LoadingAnimation';
 import { useAuth } from './hooks/useAuth';
 import { useGroup } from './hooks/useGroup';
 import { Dashboard } from './pages/Dashboard';
@@ -27,6 +28,53 @@ function App() {
   const { currentGroup, loading: groupLoading } = useGroup(!authLoading);
   const [showProfileSetup, setShowProfileSetup] = React.useState(false);
   const [showLanding, setShowLanding] = React.useState(true);
+
+  // Comprehensive mobile optimizations
+  React.useEffect(() => {
+    // Prevent horizontal scroll
+    document.body.style.overflowX = 'hidden';
+    document.documentElement.style.overflowX = 'hidden';
+    document.body.style.maxWidth = '100vw';
+    document.documentElement.style.maxWidth = '100vw';
+
+    // Prevent pull-to-refresh on mobile
+    document.body.style.overscrollBehavior = 'none';
+
+    // Add touch-action for better mobile performance
+    document.body.style.touchAction = 'pan-y pinch-zoom';
+
+    // Handle orientation change
+    const handleOrientationChange = () => {
+      // Force recalculation of viewport height
+      const vh = window.innerHeight * 0.01;
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
+    };
+
+    // Initial calculation
+    handleOrientationChange();
+
+    // Listen for orientation changes and resize
+    window.addEventListener('resize', handleOrientationChange);
+    window.addEventListener('orientationchange', handleOrientationChange);
+
+    // Prevent zoom on double tap for iOS
+    let lastTouchEnd = 0;
+    const preventDoubleTapZoom = (e: TouchEvent) => {
+      const now = Date.now();
+      if (now - lastTouchEnd <= 300) {
+        e.preventDefault();
+      }
+      lastTouchEnd = now;
+    };
+
+    document.addEventListener('touchend', preventDoubleTapZoom, { passive: false });
+
+    return () => {
+      window.removeEventListener('resize', handleOrientationChange);
+      window.removeEventListener('orientationchange', handleOrientationChange);
+      document.removeEventListener('touchend', preventDoubleTapZoom);
+    };
+  }, []);
 
   // Add console logging to debug
   React.useEffect(() => {
@@ -50,14 +98,7 @@ function App() {
 
   // Show loading spinner while checking auth and group
   if (authLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading your account...</p>
-        </div>
-      </div>
-    );
+    return <FullPageLoader message="Loading ORBIT LIVE..." />;
   }
 
   // User not logged in - show landing page or login
@@ -88,14 +129,7 @@ function App() {
 
   // Show loading while checking group membership
   if (groupLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Setting up workspace...</p>
-        </div>
-      </div>
-    );
+    return <FullPageLoader message="Setting up your workspace..." />;
   }
 
   // Wrap everything in Router since we need navigation everywhere

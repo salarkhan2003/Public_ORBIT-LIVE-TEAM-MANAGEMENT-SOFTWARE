@@ -3,6 +3,7 @@ import { Plus, Search, Calendar, CheckCircle, Clock, AlertCircle, Edit, Trash2, 
 import { supabase } from '../lib/supabase';
 import { Task } from '../types';
 import { useGroup } from '../hooks/useGroup';
+import { LoadingAnimation } from '../components/Shared/LoadingAnimation';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { motion } from 'framer-motion';
@@ -34,10 +35,14 @@ export function Tasks() {
         .eq('group_id', currentGroup.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching tasks:', error);
+        toast.error('Failed to load tasks');
+        setLoading(false);
+        return;
+      }
       setTasks(data || []);
-    } catch (error) {
-      console.error('Error fetching tasks:', error);
+    } catch {
       toast.error('Failed to load tasks');
     } finally {
       setLoading(false);
@@ -66,15 +71,18 @@ export function Tasks() {
         .update({ status: newStatus })
         .eq('id', taskId);
 
-      if (error) throw error;
-      
+      if (error) {
+        console.error('Error updating task:', error);
+        toast.error('Failed to update task');
+        return;
+      }
+
       setTasks(prev => prev.map(task => 
         task.id === taskId ? { ...task, status: newStatus } : task
       ));
       
       toast.success('Task status updated');
-    } catch (error) {
-      console.error('Error updating task:', error);
+    } catch {
       toast.error('Failed to update task');
     }
   };
@@ -86,13 +94,16 @@ export function Tasks() {
         .delete()
         .eq('id', taskId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error deleting task:', error);
+        toast.error('Failed to delete task');
+        return;
+      }
 
       setTasks(prev => prev.filter(t => t.id !== taskId));
       setDeletingTask(null);
       toast.success('Task deleted');
-    } catch (error) {
-      console.error('Error deleting task:', error);
+    } catch {
       toast.error('Failed to delete task');
     }
   };
@@ -100,9 +111,16 @@ export function Tasks() {
   const getStatusIcon = (status: Task['status']) => {
     switch (status) {
       case 'done':
+      case 'completed':
         return <CheckCircle className="w-4 h-4 text-green-600" />;
       case 'in_progress':
         return <Clock className="w-4 h-4 text-blue-600" />;
+      case 'started':
+        return <PlayCircle className="w-4 h-4 text-purple-600" />;
+      case 'need_time':
+        return <AlertCircle className="w-4 h-4 text-orange-600" />;
+      case 'todo':
+        return <AlertCircle className="w-4 h-4 text-gray-400" />;
       default:
         return <AlertCircle className="w-4 h-4 text-gray-400" />;
     }
@@ -121,53 +139,53 @@ export function Tasks() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <LoadingAnimation variant="dots" size="md" text="Loading Tasks..." />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6">
       {/* Ultra-Modern Hero Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative bg-gradient-to-br from-emerald-600 via-green-600 to-teal-600 rounded-3xl p-8 overflow-hidden shadow-2xl"
+        className="relative bg-gradient-to-br from-emerald-600 via-green-600 to-teal-600 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 overflow-hidden shadow-2xl"
       >
         <div className="absolute inset-0 bg-black/10"></div>
         <div className="absolute -right-20 -top-20 w-64 h-64 bg-yellow-400/20 rounded-full blur-3xl"></div>
         <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-cyan-400/20 rounded-full blur-3xl"></div>
 
-        <div className="relative z-10 flex items-center justify-between">
-          <div>
+        <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="min-w-0 flex-1">
             <motion.h1
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              className="text-4xl font-black text-white mb-2 tracking-tight flex items-center space-x-3"
+              className="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-1 sm:mb-2 tracking-tight flex items-center space-x-2 sm:space-x-3"
             >
-              <CheckCircle className="w-10 h-10" />
-              <span>Task Manager</span>
+              <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 flex-shrink-0" />
+              <span className="truncate">Task Manager</span>
             </motion.h1>
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.1 }}
-              className="flex items-center space-x-6 text-white/90 text-lg font-medium"
+              className="flex flex-wrap items-center gap-2 sm:gap-3 md:gap-6 text-white/90 text-xs sm:text-sm md:text-base lg:text-lg font-medium"
             >
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-green-300 rounded-full animate-pulse"></div>
-                <span>{tasks.length} Total Tasks</span>
+              <div className="flex items-center space-x-1.5 sm:space-x-2">
+                <div className="w-2 h-2 sm:w-3 sm:h-3 bg-green-300 rounded-full animate-pulse flex-shrink-0"></div>
+                <span className="whitespace-nowrap">{tasks.length} Total</span>
               </div>
-              <div className="w-1 h-6 bg-white/30"></div>
-              <div className="flex items-center space-x-2">
-                <CheckCircle className="w-5 h-5 text-green-300" />
-                <span className="font-bold">{tasks.filter(t => t.status === 'done').length} Completed</span>
+              <div className="w-0.5 h-4 sm:h-5 md:h-6 bg-white/30 hidden sm:block"></div>
+              <div className="flex items-center space-x-1.5 sm:space-x-2">
+                <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 text-green-300 flex-shrink-0" />
+                <span className="font-bold whitespace-nowrap">{tasks.filter(t => t.status === 'done' || t.status === 'completed').length} Complete</span>
               </div>
-              <div className="w-1 h-6 bg-white/30"></div>
-              <div className="flex items-center space-x-2">
-                <Clock className="w-5 h-5 text-yellow-300" />
-                <span>{tasks.filter(t => t.status === 'in_progress').length} In Progress</span>
+              <div className="w-0.5 h-4 sm:h-5 md:h-6 bg-white/30 hidden sm:block"></div>
+              <div className="flex items-center space-x-1.5 sm:space-x-2">
+                <Clock className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 text-yellow-300 flex-shrink-0" />
+                <span className="whitespace-nowrap">{tasks.filter(t => t.status === 'in_progress' || t.status === 'started').length} Active</span>
               </div>
             </motion.div>
           </div>
@@ -176,9 +194,9 @@ export function Tasks() {
             onClick={() => setShowCreateModal(true)}
             whileHover={{ scale: 1.05, rotate: 2 }}
             whileTap={{ scale: 0.95 }}
-            className="flex items-center space-x-2 px-8 py-4 bg-white text-green-600 rounded-2xl hover:bg-green-50 transition-all shadow-xl font-bold text-lg"
+            className="flex items-center space-x-1.5 sm:space-x-2 px-4 sm:px-6 md:px-8 py-2.5 sm:py-3 md:py-4 bg-white text-green-600 rounded-xl sm:rounded-2xl hover:bg-green-50 transition-all shadow-xl font-bold text-sm sm:text-base md:text-lg whitespace-nowrap flex-shrink-0"
           >
-            <Plus className="w-6 h-6" />
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
             <span>New Task</span>
           </motion.button>
         </div>
@@ -189,43 +207,48 @@ export function Tasks() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-xl rounded-2xl p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg"
+        className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-xl rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg"
       >
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col gap-3 sm:gap-4">
           <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search tasks by title, description..."
+              placeholder="Search tasks..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-12 pr-4 py-3 w-full border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all font-medium"
+              className="pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg sm:rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all font-medium text-sm sm:text-base"
             />
           </div>
 
-          <motion.select
-            whileHover={{ scale: 1.02 }}
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-green-500 font-medium min-w-[150px] transition-all"
-          >
-            <option value="all">All Status</option>
-            <option value="todo">To Do</option>
-            <option value="in_progress">In Progress</option>
-            <option value="done">Done</option>
-          </motion.select>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <motion.select
+              whileHover={{ scale: 1.02 }}
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 sm:px-4 py-2.5 sm:py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg sm:rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-green-500 font-medium flex-1 sm:min-w-[150px] transition-all text-sm sm:text-base"
+            >
+              <option value="all">All Status</option>
+              <option value="todo">📋 To Do</option>
+              <option value="started">🚀 Started</option>
+              <option value="in_progress">⚡ In Progress</option>
+              <option value="need_time">⏰ Need Time</option>
+              <option value="completed">✅ Completed</option>
+              <option value="done">✅ Done</option>
+            </motion.select>
 
-          <motion.select
-            whileHover={{ scale: 1.02 }}
-            value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value)}
-            className="px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-green-500 font-medium min-w-[150px] transition-all"
-          >
-            <option value="all">All Priority</option>
-            <option value="high">🔴 High</option>
-            <option value="medium">🟡 Medium</option>
-            <option value="low">🟢 Low</option>
-          </motion.select>
+            <motion.select
+              whileHover={{ scale: 1.02 }}
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
+              className="px-3 sm:px-4 py-2.5 sm:py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg sm:rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-green-500 font-medium flex-1 sm:min-w-[150px] transition-all text-sm sm:text-base"
+            >
+              <option value="all">All Priority</option>
+              <option value="high">🔴 High</option>
+              <option value="medium">🟡 Medium</option>
+              <option value="low">🟢 Low</option>
+            </motion.select>
+          </div>
         </div>
       </motion.div>
 

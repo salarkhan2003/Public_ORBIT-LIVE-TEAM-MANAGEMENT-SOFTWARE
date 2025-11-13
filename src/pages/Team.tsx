@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
-import { Users, Mail, Calendar, Edit, Plus, Crown, Shield, Copy, Check, Tag, X, RefreshCw, Settings, UserMinus, LogOut, UserCog } from 'lucide-react';
+import { useState } from 'react';
+import { Mail, Calendar, Edit, Plus, Crown, Shield, Copy, Check, Tag, X, RefreshCw, Settings, UserMinus, LogOut, UserCog } from 'lucide-react';
 import { useGroup } from '../hooks/useGroup';
 import { useAuth } from '../hooks/useAuth';
+import { LoadingAnimation } from '../components/Shared/LoadingAnimation';
 import { format } from 'date-fns';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
-import { useNavigate } from 'react-router-dom';
+import { User } from '../types';
 
 // Predefined role options
 const PREDEFINED_ROLES = [
@@ -17,19 +18,25 @@ const PREDEFINED_ROLES = [
   'Intern', 'Consultant', 'Contractor',
 ];
 
+interface TeamMember {
+  id: string;
+  user_id: string;
+  role: string;
+  users?: User;
+}
+
 export function Team() {
   const { currentGroup, groupMembers, refreshGroup } = useGroup();
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showRoleModal, setShowRoleModal] = useState(false);
-  const [editingMember, setEditingMember] = useState<any>(null);
+  const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
   const [showWorkspaceSettings, setShowWorkspaceSettings] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [removingMember, setRemovingMember] = useState<any>(null);
+  const [removingMember, setRemovingMember] = useState<TeamMember | null>(null);
   const [showExitModal, setShowExitModal] = useState(false);
-  const [changingAdminFor, setChangingAdminFor] = useState<any>(null);
+  const [changingAdminFor, setChangingAdminFor] = useState<TeamMember | null>(null);
 
   const currentUserMember = groupMembers.find(m => m.user_id === user?.id);
   const isAdmin = currentUserMember?.role === 'admin';
@@ -40,7 +47,7 @@ export function Team() {
     try {
       await refreshGroup();
       toast.success('Team members refreshed!');
-    } catch (error) {
+    } catch {
       toast.error('Failed to refresh team');
     } finally {
       setTimeout(() => setIsRefreshing(false), 500);
@@ -56,7 +63,7 @@ export function Team() {
     }
   };
 
-  const handleEditRoles = (member: any) => {
+  const handleEditRoles = (member: TeamMember) => {
     setEditingMember(member);
     setShowRoleModal(true);
   };
@@ -70,19 +77,22 @@ export function Team() {
         .delete()
         .eq('id', currentUserMember.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error leaving workspace:', error);
+        toast.error('Failed to leave workspace');
+        return;
+      }
 
       toast.success('You have left the workspace');
       setShowExitModal(false);
       // Redirect to group join page
       window.location.href = '/';
-    } catch (error) {
-      console.error('Error leaving workspace:', error);
+    } catch {
       toast.error('Failed to leave workspace');
     }
   };
 
-  const handleToggleAdmin = async (member: any) => {
+  const handleToggleAdmin = async (member: TeamMember) => {
     try {
       const newRole = member.role === 'admin' ? 'member' : 'admin';
 
@@ -91,7 +101,11 @@ export function Team() {
         .update({ role: newRole })
         .eq('id', member.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error changing admin status:', error);
+        toast.error('Failed to change admin status');
+        return;
+      }
 
       await refreshGroup();
       toast.success(`${member.users?.name} is now ${newRole === 'admin' ? 'an admin' : 'a member'}`);
@@ -102,33 +116,42 @@ export function Team() {
     }
   };
 
+  // Show loading if no group data yet
+  if (!currentGroup) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <LoadingAnimation variant="wave" size="md" text="Loading Team..." />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6">
       {/* Hero Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative bg-gradient-to-br from-cyan-600 via-blue-600 to-indigo-600 rounded-3xl p-8 overflow-hidden shadow-2xl"
+        className="relative bg-gradient-to-br from-cyan-600 via-blue-600 to-indigo-600 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 overflow-hidden shadow-2xl"
       >
         <div className="absolute inset-0 bg-black/10"></div>
         <div className="relative z-10">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-4xl font-black text-white mb-2">Team Members 👥</h1>
-              <p className="text-white/90 text-lg">{currentGroup?.name} • {groupMembers.length} members</p>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 md:gap-6 mb-4 sm:mb-6">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-1 sm:mb-2 truncate">Team Members 👥</h1>
+              <p className="text-white/90 text-sm sm:text-base md:text-lg truncate">{currentGroup?.name} • {groupMembers.length} members</p>
             </div>
 
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
               {/* Refresh Button */}
               <motion.button
                 onClick={handleRefresh}
                 disabled={isRefreshing}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="bg-white/20 backdrop-blur-lg text-white px-4 py-3 rounded-2xl flex items-center space-x-2 hover:bg-white/30 transition-all border border-white/30 shadow-lg font-semibold disabled:opacity-50"
+                className="bg-white/20 backdrop-blur-lg text-white px-3 sm:px-4 py-2 sm:py-3 rounded-xl sm:rounded-2xl flex items-center space-x-1.5 sm:space-x-2 hover:bg-white/30 transition-all border border-white/30 shadow-lg font-semibold disabled:opacity-50 text-sm sm:text-base"
               >
-                <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                <span>Refresh</span>
+                <RefreshCw className={`w-4 h-4 sm:w-5 sm:h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Refresh</span>
               </motion.button>
 
               {/* Workspace Settings Button */}
@@ -137,10 +160,10 @@ export function Team() {
                   onClick={() => setShowWorkspaceSettings(true)}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className="bg-white/20 backdrop-blur-lg text-white px-4 py-3 rounded-2xl flex items-center space-x-2 hover:bg-white/30 transition-all border border-white/30 shadow-lg font-semibold"
+                  className="bg-white/20 backdrop-blur-lg text-white px-3 sm:px-4 py-2 sm:py-3 rounded-xl sm:rounded-2xl flex items-center space-x-1.5 sm:space-x-2 hover:bg-white/30 transition-all border border-white/30 shadow-lg font-semibold text-sm sm:text-base"
                 >
-                  <Settings className="w-5 h-5" />
-                  <span>Workspace</span>
+                  <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span className="hidden sm:inline">Workspace</span>
                 </motion.button>
               )}
 
@@ -217,9 +240,9 @@ export function Team() {
               <div className="relative">
                 <motion.img
                   whileHover={{ scale: 1.1, rotate: 5 }}
-                  src={member.users?.avatar || `https://ui-avatars.com/api/?name=${member.users?.name}&background=3B82F6&color=fff`}
+                  src={member.users?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.users?.name || 'User')}&background=3B82F6&color=fff`}
                   alt={member.users?.name}
-                  className="w-16 h-16 rounded-full border-4 border-white dark:border-gray-700 shadow-lg"
+                  className="w-16 h-16 rounded-full border-4 border-white dark:border-gray-700 shadow-lg object-cover"
                 />
                 {member.role === 'admin' && (
                   <div className="absolute -top-1 -right-1 w-7 h-7 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg">
@@ -252,7 +275,7 @@ export function Team() {
             </div>
 
             {/* Custom Role Tags */}
-            {member.users?.custom_roles && member.users.custom_roles.length > 0 && (
+            {member.users?.custom_roles && Array.isArray(member.users.custom_roles) && member.users.custom_roles.length > 0 && (
               <div className="mb-3">
                 <div className="flex flex-wrap gap-2">
                   {member.users.custom_roles.map((role: string, idx: number) => (
@@ -355,7 +378,7 @@ export function Team() {
         />
       )}
 
-      {showWorkspaceSettings && isAdmin && (
+      {showWorkspaceSettings && isAdmin && currentGroup && (
         <WorkspaceSettingsModal
           workspace={currentGroup}
           onClose={() => setShowWorkspaceSettings(false)}
@@ -377,13 +400,16 @@ export function Team() {
                 .delete()
                 .eq('id', removingMember.id);
 
-              if (error) throw error;
+              if (error) {
+                console.error('Error removing member:', error);
+                toast.error('Failed to remove member');
+                return;
+              }
 
               await refreshGroup();
               toast.success(`${removingMember.users?.name} has been removed. They can rejoin anytime with the code!`);
               setRemovingMember(null);
-            } catch (error) {
-              console.error('Error removing member:', error);
+            } catch {
               toast.error('Failed to remove member');
             }
           }}
@@ -553,7 +579,7 @@ function ExitTeamModal({ onClose, onConfirm, workspaceName }: ExitTeamModalProps
 
 // Toggle Admin Modal
 interface ToggleAdminModalProps {
-  member: any;
+  member: TeamMember;
   onClose: () => void;
   onConfirm: () => void;
 }
@@ -655,7 +681,7 @@ function ToggleAdminModal({ member, onClose, onConfirm }: ToggleAdminModalProps)
 
 // Remove Member Modal
 interface RemoveMemberModalProps {
-  member: any;
+  member: TeamMember;
   onClose: () => void;
   onConfirm: () => void;
 }
@@ -735,7 +761,7 @@ function RemoveMemberModal({ member, onClose, onConfirm }: RemoveMemberModalProp
 
 // Role Management Modal - Simplified version
 interface RoleManagementModalProps {
-  member: any;
+  member: TeamMember;
   onClose: () => void;
   onUpdate: () => void;
 }
@@ -770,12 +796,17 @@ function RoleManagementModal({ member, onClose, onUpdate }: RoleManagementModalP
         .update({ custom_roles: selectedRoles })
         .eq('id', member.user_id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating roles:', error);
+        toast.error('Failed to update roles');
+        setIsSaving(false);
+        return;
+      }
 
+      toast.success('Roles updated successfully');
       onUpdate();
       onClose();
-    } catch (error) {
-      console.error('Error updating roles:', error);
+    } catch {
       toast.error('Failed to update roles');
     } finally {
       setIsSaving(false);
@@ -889,7 +920,12 @@ function RoleManagementModal({ member, onClose, onUpdate }: RoleManagementModalP
 
 // Workspace Settings Modal - Simplified version
 interface WorkspaceSettingsModalProps {
-  workspace: any;
+  workspace: {
+    id: string;
+    name: string;
+    description?: string;
+    join_code?: string;
+  };
   onClose: () => void;
   onUpdate: () => void;
 }
@@ -908,11 +944,15 @@ function WorkspaceSettingsModal({ workspace, onClose, onUpdate }: WorkspaceSetti
         .update({ name: workspaceName, description: workspaceDescription })
         .eq('id', workspace.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating workspace:', error);
+        toast.error('Failed to update workspace');
+        setIsSaving(false);
+        return;
+      }
       onUpdate();
       onClose();
-    } catch (error) {
-      console.error('Error updating workspace:', error);
+    } catch {
       toast.error('Failed to update workspace');
     } finally {
       setIsSaving(false);
@@ -924,11 +964,15 @@ function WorkspaceSettingsModal({ workspace, onClose, onUpdate }: WorkspaceSetti
     try {
       const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
       const { error } = await supabase.from('groups').update({ join_code: newCode }).eq('id', workspace.id);
-      if (error) throw error;
+      if (error) {
+        console.error('Error regenerating code:', error);
+        toast.error('Failed to regenerate join code');
+        setIsRegeneratingCode(false);
+        return;
+      }
       toast.success('New join code generated!');
       onUpdate();
-    } catch (error) {
-      console.error('Error regenerating code:', error);
+    } catch {
       toast.error('Failed to regenerate join code');
     } finally {
       setIsRegeneratingCode(false);

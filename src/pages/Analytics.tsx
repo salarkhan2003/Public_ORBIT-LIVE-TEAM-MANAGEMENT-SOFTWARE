@@ -3,6 +3,7 @@ import { BarChart3, TrendingUp, Users, Target, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { ActivityLog, Task, Project, Meeting } from '../types';
 import { useGroup } from '../hooks/useGroup';
+import { LoadingAnimation } from '../components/Shared/LoadingAnimation';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { motion } from 'framer-motion';
 
@@ -226,8 +227,8 @@ export function Analytics() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <LoadingAnimation variant="bars" size="md" text="Loading Analytics..." />
       </div>
     );
   }

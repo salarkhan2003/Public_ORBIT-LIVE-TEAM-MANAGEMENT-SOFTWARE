@@ -1,17 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, User, Bell, Shield, Palette, Globe, Save, Eye, EyeOff, LogOut, Users as UsersIcon } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Settings as SettingsIcon, User, Bell, Shield, Palette, Save, Eye, EyeOff, LogOut, Users as UsersIcon, Check } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { UserSettings, User as UserType } from '../types';
+import { User as UserType } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../hooks/useTheme';
 import { useGroup } from '../hooks/useGroup';
+import { LoadingAnimation } from '../components/Shared/LoadingAnimation';
+import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 
 export function Settings() {
   const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'privacy' | 'appearance' | 'workspace'>('profile');
-  const [loading, setLoading] = useState(false);
-  const [settings, setSettings] = useState<Record<string, any>>({});
+  const [loading, setLoading] = useState(true);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [settings, setSettings] = useState<Record<string, string | boolean | number>>({});
   const [profileData, setProfileData] = useState<Partial<UserType>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
@@ -20,19 +23,13 @@ export function Settings() {
     newPassword: '',
     confirmPassword: '',
   });
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const { currentGroup, leaveGroup, refreshGroup } = useGroup();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (user) {
-      fetchSettings();
-      setProfileData(user);
-    }
-  }, [user]);
-
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -41,38 +38,68 @@ export function Settings() {
         .select('*')
         .eq('user_id', user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching settings:', error);
+        return;
+      }
 
       const settingsMap = (data || []).reduce((acc, setting) => {
         acc[setting.setting_key] = setting.setting_value;
         return acc;
-      }, {} as Record<string, any>);
+      }, {} as Record<string, string | boolean | number>);
 
       setSettings(settingsMap);
-    } catch (error) {
-      console.error('Error fetching settings:', error);
+    } catch {
+      console.error('Error fetching settings');
     }
-  };
+  }, [user]);
 
-  const updateSetting = async (key: string, value: any, type: UserSettings['setting_type']) => {
+  useEffect(() => {
+    if (user) {
+      fetchSettings();
+      setProfileData(user);
+      setLoading(false);
+    }
+  }, [user, fetchSettings]);
+
+  const updateSetting = async (key: string, value: string | boolean | number, type: 'notifications' | 'privacy' | 'theme') => {
     if (!user) return;
 
+    // Update UI immediately (optimistic update)
+    const previousValue = settings[key];
+    setSettings(prev => ({ ...prev, [key]: value }));
+
     try {
+      // Map frontend types to database enum values
+      const dbType = type === 'notifications' ? 'notification' :
+                     type === 'privacy' ? 'privacy' :
+                     type === 'theme' ? 'appearance' : 'preference';
+
       const { error } = await supabase
         .from('user_settings')
         .upsert({
           user_id: user.id,
           setting_key: key,
-          setting_value: value,
-          setting_type: type,
+          setting_value: value, // Supabase will automatically convert to JSONB
+          setting_type: dbType,
+        }, {
+          onConflict: 'user_id,setting_key'
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating setting:', error);
+        // Revert on error
+        setSettings(prev => ({ ...prev, [key]: previousValue }));
+        toast.error('Failed to update setting');
+        return;
+      }
 
-      setSettings(prev => ({ ...prev, [key]: value }));
-    } catch (error) {
-      console.error('Error updating setting:', error);
-      throw error;
+      // Silent success - no toast needed for instant updates
+    } catch (err) {
+      console.error('Caught error updating setting:', err);
+      // Revert on error
+      setSettings(prev => ({ ...prev, [key]: previousValue }));
+      toast.error('Failed to update setting');
     }
   };
 
@@ -86,11 +113,15 @@ export function Settings() {
         .update(profileData)
         .eq('id', user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating profile:', error);
+        toast.error('Failed to update profile');
+        setLoading(false);
+        return;
+      }
 
       toast.success('Profile updated successfully');
-    } catch (error) {
-      console.error('Error updating profile:', error);
+    } catch {
       toast.error('Failed to update profile');
     } finally {
       setLoading(false);
@@ -114,7 +145,12 @@ export function Settings() {
         password: passwordData.newPassword
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating password:', error);
+        toast.error('Failed to update password');
+        setLoading(false);
+        return;
+      }
 
       setPasswordData({
         currentPassword: '',
@@ -123,11 +159,85 @@ export function Settings() {
       });
 
       toast.success('Password updated successfully');
-    } catch (error) {
-      console.error('Error updating password:', error);
+    } catch {
       toast.error('Failed to update password');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file');
+      return;
+    }
+
+    // Validate file size (1MB = 1048576 bytes)
+    if (file.size > 1048576) {
+      toast.error('Image size must be less than 1MB');
+      return;
+    }
+
+    setUploadingAvatar(true);
+    toast.loading('Uploading avatar...', { id: 'avatar-upload' });
+
+    try {
+      // Create unique file name
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, {
+          upsert: true,
+          contentType: file.type
+        });
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        toast.error('Failed to upload avatar', { id: 'avatar-upload' });
+        return;
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      // Update user profile with new avatar URL
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ avatar: publicUrl })
+        .eq('id', user.id);
+
+      if (updateError) {
+        console.error('Update error:', updateError);
+        toast.error('Failed to update profile', { id: 'avatar-upload' });
+        return;
+      }
+
+      // Update local state
+      setProfileData(prev => ({ ...prev, avatar: publicUrl }));
+      toast.success('Avatar updated successfully!', { id: 'avatar-upload' });
+    } catch (error) {
+      console.error('Avatar upload error:', error);
+      toast.error('Failed to upload avatar', { id: 'avatar-upload' });
+    } finally {
+      setUploadingAvatar(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -156,165 +266,272 @@ export function Settings() {
     { id: 'appearance', label: 'Appearance', icon: Palette },
   ] as const;
 
-  return (
-    <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center">
-          <SettingsIcon className="w-7 h-7 mr-3" />
-          Settings
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          Manage your account settings and preferences
-        </p>
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <LoadingAnimation variant="pulse" size="md" text="Loading Settings..." />
       </div>
+    );
+  }
 
-      <div className="flex flex-col lg:flex-row gap-6">
-        {/* Settings Navigation */}
-        <div className="lg:w-64">
-          <nav className="space-y-1">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                    activeTab === tab.id
-                      ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                  }`}
-                >
-                  <Icon className="w-5 h-5 mr-3" />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </nav>
+  return (
+    <div className="space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6 max-w-full overflow-x-hidden">
+      {/* Stylish Header with Gradient */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8 overflow-hidden shadow-2xl"
+      >
+        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="relative z-10">
+          <div className="flex items-center">
+            <div className="bg-white/20 backdrop-blur-sm p-2 sm:p-3 rounded-lg sm:rounded-xl mr-3 sm:mr-4">
+              <SettingsIcon className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-white truncate">Settings ⚙️</h1>
+              <p className="text-white/90 text-xs sm:text-sm md:text-base truncate">
+                Customize your experience in real-time
+              </p>
+            </div>
+          </div>
         </div>
+      </motion.div>
+
+      <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
+        {/* Settings Navigation - Stylish */}
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="w-full lg:w-64 lg:flex-shrink-0"
+        >
+          <div className="bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-1.5 sm:p-2">
+            <nav className="space-y-1">
+              {tabs.map((tab, index) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <motion.button
+                    key={tab.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`w-full flex items-center px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold rounded-lg transition-all min-h-[44px] ${
+                      isActive
+                        ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg scale-105'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:scale-102'
+                    }`}
+                  >
+                    <Icon className={`w-4 h-4 sm:w-5 sm:h-5 mr-2 sm:mr-3 flex-shrink-0 ${isActive ? 'animate-pulse' : ''}`} />
+                    <span className="truncate">{tab.label}</span>
+                  </motion.button>
+                );
+              })}
+            </nav>
+          </div>
+        </motion.div>
 
         {/* Settings Content */}
-        <div className="flex-1">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="flex-1 min-w-0 overflow-x-hidden">
+          <div className="bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
             {/* Profile Settings */}
             {activeTab === 'profile' && (
-              <div className="p-6">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
-                  Profile Information
-                </h2>
-                
-                <div className="space-y-6">
-                  <div className="flex items-center space-x-6">
-                    <img
-                      src={profileData.avatar || `https://ui-avatars.com/api/?name=${profileData.name}&background=3B82F6&color=fff`}
-                      alt={profileData.name}
-                      className="w-20 h-20 rounded-full"
-                    />
-                    <div>
-                      <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                        Change Avatar
-                      </button>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        JPG, GIF or PNG. 1MB max.
-                      </p>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-6 sm:p-8"
+              >
+                {/* Header */}
+                <div className="flex items-center mb-6 sm:mb-8">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg sm:rounded-xl flex items-center justify-center mr-3 sm:mr-4 flex-shrink-0">
+                    <User className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate">
+                      Profile Information
+                    </h2>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">
+                      Manage your personal information
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-6 sm:space-y-8">
+                  {/* Avatar Section */}
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700 rounded-xl sm:rounded-2xl p-4 sm:p-6 border-2 border-blue-200 dark:border-gray-600">
+                    <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-6">
+                      <div className="relative group flex-shrink-0">
+                        <img
+                          src={profileData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(profileData.name || 'User')}&background=gradient&color=fff`}
+                          alt={profileData.name}
+                          className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl sm:rounded-2xl ring-4 ring-white dark:ring-gray-700 shadow-xl group-hover:scale-105 transition-transform object-cover"
+                        />
+                        <div
+                          onClick={handleAvatarClick}
+                          className="absolute inset-0 bg-black/50 rounded-xl sm:rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
+                        >
+                          {uploadingAvatar ? (
+                            <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-2 border-white border-t-transparent" />
+                          ) : (
+                            <User className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-center sm:text-left w-full sm:w-auto">
+                        <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white mb-2 truncate">
+                          {profileData.name || 'Your Name'}
+                        </h3>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleAvatarUpload}
+                          className="hidden"
+                        />
+                        <button
+                          onClick={handleAvatarClick}
+                          disabled={uploadingAvatar}
+                          className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg sm:rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl font-semibold text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                          {uploadingAvatar ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                              <span>Uploading...</span>
+                            </>
+                          ) : (
+                            <>
+                              <User className="w-4 h-4" />
+                              <span>Change Avatar</span>
+                            </>
+                          )}
+                        </button>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                          JPG, GIF or PNG. 1MB max.
+                        </p>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Full Name
-                      </label>
-                      <input
-                        type="text"
-                        value={profileData.name || ''}
-                        onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
+                  {/* Personal Information */}
+                  <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
+                    <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white mb-4 sm:mb-6 flex items-center">
+                      <span className="w-2 h-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full mr-2 sm:mr-3"></span>
+                      Personal Details
+                    </h3>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                      <div className="space-y-2">
+                        <label className="flex items-center text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          <span className="mr-2">👤</span>
+                          Full Name
+                        </label>
+                        <input
+                          type="text"
+                          value={profileData.name || ''}
+                          onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
+                          className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg sm:rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
+                          placeholder="Enter your full name"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="flex items-center text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          <span className="mr-2">📧</span>
+                          Email Address
+                        </label>
+                        <input
+                          type="email"
+                          value={profileData.email || ''}
+                          onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
+                          className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg sm:rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
+                          placeholder="your.email@example.com"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="flex items-center text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          <span className="mr-2">💼</span>
+                          Job Title
+                        </label>
+                        <input
+                          type="text"
+                          value={profileData.title || ''}
+                          onChange={(e) => setProfileData({ ...profileData, title: e.target.value })}
+                          className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg sm:rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
+                          placeholder="Your role"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="flex items-center text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          <span className="mr-2">🏢</span>
+                          Department
+                        </label>
+                        <input
+                          type="text"
+                          value={profileData.department || ''}
+                          onChange={(e) => setProfileData({ ...profileData, department: e.target.value })}
+                          className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg sm:rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
+                          placeholder="Your department"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="flex items-center text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          <span className="mr-2">📱</span>
+                          Phone Number
+                        </label>
+                        <input
+                          type="tel"
+                          value={profileData.phone || ''}
+                          onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
+                          className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg sm:rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
+                          placeholder="+1 (555) 123-4567"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="flex items-center text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          <span className="mr-2">📍</span>
+                          Location
+                        </label>
+                        <input
+                          type="text"
+                          value={profileData.location || ''}
+                          onChange={(e) => setProfileData({ ...profileData, location: e.target.value })}
+                          className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg sm:rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
+                          placeholder="City, Country"
+                        />
+                      </div>
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Email
+                    <div className="space-y-2">
+                      <label className="flex items-center text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        <span className="mr-2">✍️</span>
+                        Bio
                       </label>
-                      <input
-                        type="email"
-                        value={profileData.email || ''}
-                        onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Job Title
-                      </label>
-                      <input
-                        type="text"
-                        value={profileData.title || ''}
-                        onChange={(e) => setProfileData({ ...profileData, title: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Department
-                      </label>
-                      <input
-                        type="text"
-                        value={profileData.department || ''}
-                        onChange={(e) => setProfileData({ ...profileData, department: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Phone
-                      </label>
-                      <input
-                        type="tel"
-                        value={profileData.phone || ''}
-                        onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Location
-                      </label>
-                      <input
-                        type="text"
-                        value={profileData.location || ''}
-                        onChange={(e) => setProfileData({ ...profileData, location: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      <textarea
+                        value={profileData.bio || ''}
+                        onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
+                        rows={4}
+                        className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg sm:rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none text-sm sm:text-base"
+                        placeholder="Tell us about yourself..."
                       />
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Bio
-                    </label>
-                    <textarea
-                      value={profileData.bio || ''}
-                      onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
-                      rows={4}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                      placeholder="Tell us about yourself..."
-                    />
-                  </div>
-
-                  {/* Password Change Section */}
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                  {/* Change Password Section */}
+                  <div className="bg-gradient-to-br from-red-50 to-orange-50 dark:from-gray-800 dark:to-gray-700 rounded-xl sm:rounded-2xl p-4 sm:p-6 border-2 border-red-200 dark:border-gray-600">
+                    <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white mb-4 sm:mb-6 flex items-center">
+                      <span className="w-2 h-2 bg-gradient-to-r from-red-500 to-orange-500 rounded-full mr-2 sm:mr-3"></span>
                       Change Password
                     </h3>
                     
                     <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      <div className="space-y-2">
+                        <label className="flex items-center text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          <span className="mr-2">🔒</span>
                           Current Password
                         </label>
                         <div className="relative">
@@ -322,79 +539,104 @@ export function Settings() {
                             type={showPassword ? 'text' : 'password'}
                             value={passwordData.currentPassword}
                             onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                            className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full px-3 sm:px-4 py-2.5 sm:py-3 pr-10 sm:pr-12 border-2 border-gray-200 dark:border-gray-600 rounded-lg sm:rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all text-sm sm:text-base"
+                            placeholder="Enter current password"
                           />
                           <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                            className="absolute inset-y-0 right-0 pr-3 sm:pr-4 flex items-center hover:scale-110 transition-transform min-w-[44px] justify-center"
                           >
                             {showPassword ? (
-                              <EyeOff className="h-5 w-5 text-gray-400" />
+                              <EyeOff className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 hover:text-gray-600" />
                             ) : (
-                              <Eye className="h-5 w-5 text-gray-400" />
+                              <Eye className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 hover:text-gray-600" />
                             )}
                           </button>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <div className="space-y-2">
+                          <label className="flex items-center text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300">
+                            <span className="mr-2">🔑</span>
                             New Password
                           </label>
                           <input
                             type={showPassword ? 'text' : 'password'}
                             value={passwordData.newPassword}
                             onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg sm:rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all text-sm sm:text-base"
+                            placeholder="Enter new password"
                           />
                         </div>
 
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <div className="space-y-2">
+                          <label className="flex items-center text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300">
+                            <span className="mr-2">✅</span>
                             Confirm New Password
                           </label>
                           <input
                             type={showPassword ? 'text' : 'password'}
                             value={passwordData.confirmPassword}
                             onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg sm:rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all text-sm sm:text-base"
+                            placeholder="Confirm new password"
                           />
                         </div>
                       </div>
 
-                      <button
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={updatePassword}
                         disabled={loading || !passwordData.newPassword}
-                        className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="w-full sm:w-auto bg-gradient-to-r from-red-600 to-orange-600 text-white px-5 sm:px-6 py-2.5 sm:py-3 rounded-lg sm:rounded-xl hover:from-red-700 hover:to-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg font-semibold flex items-center justify-center text-sm sm:text-base min-h-[44px]"
                       >
-                        Update Password
-                      </button>
+                        <Shield className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                        {loading ? 'Updating...' : 'Update Password'}
+                      </motion.button>
                     </div>
                   </div>
 
-                  <div className="flex justify-end pt-6 border-t border-gray-200 dark:border-gray-700">
-                    <button
+                  {/* Save Changes Button */}
+                  <div className="flex justify-end">
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
                       onClick={updateProfile}
                       disabled={loading}
-                      className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
+                      className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg sm:rounded-xl hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xl font-bold text-base sm:text-lg flex items-center justify-center min-h-[44px]"
                     >
-                      <Save className="w-4 h-4" />
-                      <span>{loading ? 'Saving...' : 'Save Changes'}</span>
-                    </button>
+                      <Save className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                      {loading ? 'Saving...' : 'Save Changes'}
+                    </motion.button>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             )}
 
             {/* Workspace Settings */}
             {activeTab === 'workspace' && (
-              <div className="p-6">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
-                  Workspace Settings
-                </h2>
-                
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-6 sm:p-8"
+              >
+                <div className="flex items-center mb-8">
+                  <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center mr-4">
+                    <UsersIcon className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                      Workspace Settings
+                    </h2>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Manage your workspace preferences
+                    </p>
+                  </div>
+                </div>
+
                 <div className="space-y-6">
                   {currentGroup && (
                     <>
@@ -447,93 +689,106 @@ export function Settings() {
                     </>
                   )}
                 </div>
-              </div>
+              </motion.div>
             )}
 
             {/* Notification Settings */}
             {activeTab === 'notifications' && (
-              <div className="p-6">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
-                  Notification Preferences
-                </h2>
-                
-                <div className="space-y-6">
-                  <div className="space-y-4">
-                    <h3 className="text-md font-medium text-gray-900 dark:text-white">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-6"
+              >
+                <div className="flex items-center mb-6 sm:mb-8">
+                  <Bell className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-600 dark:text-indigo-400 mr-2 sm:mr-3 flex-shrink-0" />
+                  <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate">
+                    Notification Preferences
+                  </h2>
+                </div>
+
+                <div className="space-y-4 sm:space-y-6">
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700 rounded-lg sm:rounded-xl p-4 sm:p-6 border border-blue-200 dark:border-gray-600 shadow-md">
+                    <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white mb-3 sm:mb-4 flex items-center">
+                      <span className="w-2 h-2 bg-blue-500 rounded-full mr-2 animate-pulse"></span>
                       Email Notifications
                     </h3>
                     
                     {[
-                      { key: 'email_tasks', label: 'Task assignments and updates', description: 'Get notified when tasks are assigned to you or updated' },
-                      { key: 'email_meetings', label: 'Meeting reminders', description: 'Receive reminders for upcoming meetings' },
-                      { key: 'email_projects', label: 'Project updates', description: 'Stay informed about project progress and changes' },
-                      { key: 'email_weekly', label: 'Weekly summary', description: 'Get a weekly digest of your team\'s activity' },
-                    ].map((item) => (
-                      <div key={item.key} className="flex items-start space-x-3">
+                      { key: 'email_tasks', label: 'Task assignments and updates', description: 'Get notified when tasks are assigned to you or updated', icon: '📋' },
+                      { key: 'email_meetings', label: 'Meeting reminders', description: 'Receive reminders for upcoming meetings', icon: '📅' },
+                      { key: 'email_projects', label: 'Project updates', description: 'Stay informed about project progress and changes', icon: '🎯' },
+                      { key: 'email_weekly', label: 'Weekly summary', description: 'Get a weekly digest of your team\'s activity', icon: '📊' },
+                    ].map((item, index) => (
+                      <motion.div
+                        key={item.key}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="flex items-start space-x-2 sm:space-x-3 p-2 sm:p-3 rounded-lg hover:bg-white/50 dark:hover:bg-gray-700/50 transition-all min-h-[44px]"
+                      >
                         <input
                           type="checkbox"
                           id={item.key}
-                          checked={settings[item.key] || false}
-                          onChange={async (e) => {
-                            try {
-                              await updateSetting(item.key, e.target.checked, 'notifications');
-                              toast.success('Notification preference updated');
-                            } catch (error) {
-                              toast.error('Failed to update preference');
-                            }
+                          checked={Boolean(settings[item.key])}
+                          onChange={(e) => {
+                            updateSetting(item.key, e.target.checked, 'notifications');
                           }}
-                          className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          className="mt-0.5 sm:mt-1 h-5 w-5 sm:h-6 sm:w-6 text-indigo-600 focus:ring-2 focus:ring-indigo-500 border-gray-300 rounded transition-all cursor-pointer flex-shrink-0"
                         />
-                        <div className="flex-1">
-                          <label htmlFor={item.key} className="text-sm font-medium text-gray-900 dark:text-white">
-                            {item.label}
+                        <div className="flex-1 min-w-0">
+                          <label htmlFor={item.key} className="flex items-center text-xs sm:text-sm font-semibold text-gray-900 dark:text-white cursor-pointer">
+                            <span className="mr-1.5 sm:mr-2 flex-shrink-0">{item.icon}</span>
+                            <span className="truncate">{item.label}</span>
                           </label>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 line-clamp-2">
                             {item.description}
                           </p>
                         </div>
-                      </div>
+                      </motion.div>
                     ))}
                   </div>
 
-                  <div className="space-y-4">
-                    <h3 className="text-md font-medium text-gray-900 dark:text-white">
+                  <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-gray-800 dark:to-gray-700 rounded-lg sm:rounded-xl p-4 sm:p-6 border border-purple-200 dark:border-gray-600 shadow-md">
+                    <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white mb-3 sm:mb-4 flex items-center">
+                      <span className="w-2 h-2 bg-purple-500 rounded-full mr-2 animate-pulse"></span>
                       Push Notifications
                     </h3>
                     
                     {[
-                      { key: 'push_tasks', label: 'Task notifications', description: 'Instant notifications for task updates' },
-                      { key: 'push_mentions', label: 'Mentions and comments', description: 'When someone mentions you or comments on your work' },
-                      { key: 'push_deadlines', label: 'Deadline reminders', description: 'Alerts for approaching deadlines' },
-                    ].map((item) => (
-                      <div key={item.key} className="flex items-start space-x-3">
+                      { key: 'push_tasks', label: 'Task notifications', description: 'Instant notifications for task updates', icon: '🔔' },
+                      { key: 'push_mentions', label: 'Mentions and comments', description: 'When someone mentions you or comments on your work', icon: '💬' },
+                      { key: 'push_deadlines', label: 'Deadline reminders', description: 'Alerts for approaching deadlines', icon: '⏰' },
+                    ].map((item, index) => (
+                      <motion.div
+                        key={item.key}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="flex items-start space-x-2 sm:space-x-3 p-2 sm:p-3 rounded-lg hover:bg-white/50 dark:hover:bg-gray-700/50 transition-all min-h-[44px]"
+                      >
                         <input
                           type="checkbox"
                           id={item.key}
-                          checked={settings[item.key] || false}
-                          onChange={async (e) => {
-                            try {
-                              await updateSetting(item.key, e.target.checked, 'notifications');
-                              toast.success('Notification preference updated');
-                            } catch (error) {
-                              toast.error('Failed to update preference');
-                            }
+                          checked={Boolean(settings[item.key])}
+                          onChange={(e) => {
+                            updateSetting(item.key, e.target.checked, 'notifications');
                           }}
-                          className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          className="mt-0.5 sm:mt-1 h-5 w-5 sm:h-6 sm:w-6 text-purple-600 focus:ring-2 focus:ring-purple-500 border-gray-300 rounded transition-all cursor-pointer flex-shrink-0"
                         />
-                        <div className="flex-1">
-                          <label htmlFor={item.key} className="text-sm font-medium text-gray-900 dark:text-white">
-                            {item.label}
+                        <div className="flex-1 min-w-0">
+                          <label htmlFor={item.key} className="flex items-center text-xs sm:text-sm font-semibold text-gray-900 dark:text-white cursor-pointer">
+                            <span className="mr-1.5 sm:mr-2 flex-shrink-0">{item.icon}</span>
+                            <span className="truncate">{item.label}</span>
                           </label>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 line-clamp-2">
                             {item.description}
                           </p>
                         </div>
-                      </div>
+                      </motion.div>
                     ))}
                   </div>
                 </div>
-              </div>
+              </motion.div>
             )}
 
             {/* Privacy Settings */}
@@ -559,12 +814,12 @@ export function Settings() {
                         <input
                           type="checkbox"
                           id={item.key}
-                          checked={settings[item.key] || false}
+                          checked={Boolean(settings[item.key])}
                           onChange={async (e) => {
                             try {
                               await updateSetting(item.key, e.target.checked, 'privacy');
                               toast.success('Privacy setting updated');
-                            } catch (error) {
+                            } catch {
                               toast.error('Failed to update setting');
                             }
                           }}
@@ -595,12 +850,12 @@ export function Settings() {
                         <input
                           type="checkbox"
                           id={item.key}
-                          checked={settings[item.key] || false}
+                          checked={Boolean(settings[item.key])}
                           onChange={async (e) => {
                             try {
                               await updateSetting(item.key, e.target.checked, 'privacy');
                               toast.success('Privacy setting updated');
-                            } catch (error) {
+                            } catch {
                               toast.error('Failed to update setting');
                             }
                           }}
@@ -623,99 +878,122 @@ export function Settings() {
 
             {/* Appearance Settings */}
             {activeTab === 'appearance' && (
-              <div className="p-6">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
-                  Appearance & Display
-                </h2>
-                
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-md font-medium text-gray-900 dark:text-white mb-4">
-                      Theme
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-6 sm:p-8"
+              >
+                <div className="flex items-center mb-6 sm:mb-8">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg sm:rounded-xl flex items-center justify-center mr-3 sm:mr-4 flex-shrink-0">
+                    <Palette className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate">
+                      Appearance & Display
+                    </h2>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">
+                      Customize your visual experience
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-6 sm:space-y-8">
+                  {/* Theme Selection */}
+                  <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-gray-800 dark:to-gray-700 rounded-xl sm:rounded-2xl p-4 sm:p-6 border-2 border-purple-200 dark:border-gray-600">
+                    <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white mb-4 sm:mb-6 flex items-center">
+                      <span className="w-2 h-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full mr-2 sm:mr-3 animate-pulse"></span>
+                      Choose Theme
                     </h3>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                       {[
-                        { value: 'light', label: 'Light', description: 'Clean and bright interface' },
-                        { value: 'dark', label: 'Dark', description: 'Easy on the eyes in low light' },
-                        { value: 'system', label: 'System', description: 'Follow your system preference' },
-                      ].map((theme) => (
-                        <div
-                          key={theme.value}
-                          onClick={() => {
-                            if (theme.value === 'dark' && !isDark) toggleTheme();
-                            if (theme.value === 'light' && isDark) toggleTheme();
-                          }}
-                          className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${
-                            (theme.value === 'dark' && isDark) || (theme.value === 'light' && !isDark)
-                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                              : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                          }`}
-                        >
-                          <div className="flex items-center space-x-3">
-                            <div className={`w-4 h-4 rounded-full border-2 ${
-                              (theme.value === 'dark' && isDark) || (theme.value === 'light' && !isDark)
-                                ? 'border-blue-500 bg-blue-500'
-                                : 'border-gray-300 dark:border-gray-600'
-                            }`}>
-                              {((theme.value === 'dark' && isDark) || (theme.value === 'light' && !isDark)) && (
-                                <div className="w-2 h-2 bg-white rounded-full m-0.5"></div>
-                              )}
-                            </div>
-                            <div>
-                              <p className="font-medium text-gray-900 dark:text-white">
+                        { value: 'light', label: 'Light', description: 'Clean and bright interface', icon: '☀️', gradient: 'from-yellow-400 to-orange-500' },
+                        { value: 'dark', label: 'Dark', description: 'Easy on the eyes in low light', icon: '🌙', gradient: 'from-indigo-600 to-purple-700' },
+                        { value: 'system', label: 'System', description: 'Follow your system preference', icon: '💻', gradient: 'from-blue-500 to-cyan-500' },
+                      ].map((theme, index) => {
+                        const isActive = (theme.value === 'dark' && isDark) || (theme.value === 'light' && !isDark);
+                        return (
+                          <motion.div
+                            key={theme.value}
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: index * 0.1 }}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => {
+                              if (theme.value === 'dark' && !isDark) toggleTheme();
+                              if (theme.value === 'light' && isDark) toggleTheme();
+                            }}
+                            className={`relative p-4 sm:p-6 rounded-xl sm:rounded-2xl cursor-pointer transition-all shadow-lg min-h-[120px] sm:min-h-[140px] ${
+                              isActive
+                                ? `bg-gradient-to-br ${theme.gradient} border-2 border-white shadow-2xl`
+                                : 'bg-white dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600 hover:shadow-xl'
+                            }`}
+                          >
+                            {isActive && (
+                              <div className="absolute top-2 right-2 sm:top-3 sm:right-3 w-5 h-5 sm:w-6 sm:h-6 bg-white rounded-full flex items-center justify-center">
+                                <Check className="w-3 h-3 sm:w-4 sm:h-4 text-green-600" />
+                              </div>
+                            )}
+                            <div className="text-center">
+                              <div className={`text-3xl sm:text-4xl mb-2 sm:mb-3 ${isActive ? 'animate-bounce' : ''}`}>{theme.icon}</div>
+                              <p className={`font-bold text-base sm:text-lg mb-1 sm:mb-2 ${isActive ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
                                 {theme.label}
                               </p>
-                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                              <p className={`text-xs sm:text-sm ${isActive ? 'text-white/90' : 'text-gray-600 dark:text-gray-400'}`}>
                                 {theme.description}
                               </p>
                             </div>
-                          </div>
-                        </div>
-                      ))}
+                          </motion.div>
+                        );
+                      })}
                     </div>
                   </div>
 
-                  <div>
-                    <h3 className="text-md font-medium text-gray-900 dark:text-white mb-4">
+                  {/* Display Options */}
+                  <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
+                    <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white mb-4 sm:mb-6 flex items-center">
+                      <span className="w-2 h-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full mr-2 sm:mr-3"></span>
                       Display Options
                     </h3>
                     
-                    <div className="space-y-4">
+                    <div className="space-y-3 sm:space-y-4">
                       {[
-                        { key: 'compact_mode', label: 'Compact mode', description: 'Show more content in less space' },
-                        { key: 'show_avatars', label: 'Show user avatars', description: 'Display profile pictures throughout the app' },
-                        { key: 'animations', label: 'Enable animations', description: 'Smooth transitions and micro-interactions' },
-                      ].map((item) => (
-                        <div key={item.key} className="flex items-start space-x-3">
+                        { key: 'compact_mode', label: 'Compact mode', description: 'Show more content in less space', icon: '🗜️' },
+                        { key: 'show_avatars', label: 'Show user avatars', description: 'Display profile pictures throughout the app', icon: '👤' },
+                        { key: 'animations', label: 'Enable animations', description: 'Smooth transitions and micro-interactions', icon: '✨' },
+                      ].map((item, index) => (
+                        <motion.div
+                          key={item.key}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                          className="flex items-start space-x-2 sm:space-x-3 p-3 sm:p-4 rounded-lg sm:rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all min-h-[44px]"
+                        >
                           <input
                             type="checkbox"
                             id={item.key}
-                            checked={settings[item.key] || false}
-                            onChange={async (e) => {
-                              try {
-                                await updateSetting(item.key, e.target.checked, 'theme');
-                                toast.success('Display setting updated');
-                              } catch (error) {
-                                toast.error('Failed to update setting');
-                              }
+                            checked={Boolean(settings[item.key])}
+                            onChange={(e) => {
+                              updateSetting(item.key, e.target.checked, 'theme');
                             }}
-                            className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            className="mt-0.5 sm:mt-1 h-5 w-5 sm:h-6 sm:w-6 text-purple-600 focus:ring-2 focus:ring-purple-500 border-gray-300 rounded-lg transition-all cursor-pointer flex-shrink-0"
                           />
-                          <div className="flex-1">
-                            <label htmlFor={item.key} className="text-sm font-medium text-gray-900 dark:text-white">
-                              {item.label}
+                          <div className="flex-1 min-w-0">
+                            <label htmlFor={item.key} className="flex items-center text-xs sm:text-sm font-semibold text-gray-900 dark:text-white cursor-pointer">
+                              <span className="mr-1.5 sm:mr-2 flex-shrink-0">{item.icon}</span>
+                              <span className="truncate">{item.label}</span>
                             </label>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 line-clamp-2">
                               {item.description}
                             </p>
                           </div>
-                        </div>
+                        </motion.div>
                       ))}
                     </div>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             )}
           </div>
         </div>

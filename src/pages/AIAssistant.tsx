@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Bot, Send, Trash2, Plus, MessageSquare, Sparkles, Zap, Clock, TrendingUp, Target } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Bot, Send, Trash2, Plus, MessageSquare, Sparkles, Zap } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { AIConversation, AIMessage } from '../types';
 import { useGroup } from '../hooks/useGroup';
 import { useAuth } from '../hooks/useAuth';
-import { generateSmartResponse, parseNaturalLanguageCommand } from '../lib/gemini';
+import { LoadingAnimation } from '../components/Shared/LoadingAnimation';
+import { generateSmartResponse } from '../lib/gemini';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -15,7 +16,7 @@ export function AIAssistant() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingConversations, setLoadingConversations] = useState(true);
-  const [suggestions, setSuggestions] = useState<string[]>([
+  const [suggestions] = useState<string[]>([
     "What tasks are assigned to me?",
     "Show me this week's deadlines",
     "What's our team's progress?",
@@ -23,24 +24,10 @@ export function AIAssistant() {
     "Schedule a team meeting"
   ]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { currentGroup, groupMembers } = useGroup();
+  const { currentGroup } = useGroup();
   const { user } = useAuth();
 
-  useEffect(() => {
-    if (currentGroup && user) {
-      fetchConversations();
-    }
-  }, [currentGroup, user]);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [activeConversation?.messages]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const fetchConversations = async () => {
+  const fetchConversations = useCallback(async () => {
     if (!currentGroup || !user) return;
 
     try {
@@ -51,23 +38,60 @@ export function AIAssistant() {
         .eq('user_id', user.id)
         .order('updated_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching conversations:', error);
+        toast.error('Failed to load conversations');
+        setLoadingConversations(false);
+        return;
+      }
+
       setConversations(data || []);
-      
+
       if (data && data.length > 0 && !activeConversation) {
         setActiveConversation(data[0]);
       }
-    } catch (error) {
-      console.error('Error fetching conversations:', error);
+    } catch {
       toast.error('Failed to load conversations');
     } finally {
       setLoadingConversations(false);
     }
+  }, [currentGroup, user, activeConversation]);
+
+  useEffect(() => {
+    if (currentGroup && user) {
+      fetchConversations();
+    }
+  }, [currentGroup, user, fetchConversations]);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [activeConversation?.messages]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const createNewConversation = async () => {
     if (!currentGroup || !user) return;
 
+    // Create optimistic conversation immediately
+    const tempId = `temp-${Date.now()}`;
+    const optimisticConversation: AIConversation = {
+      id: tempId,
+      user_id: user.id,
+      group_id: currentGroup.id,
+      title: 'New Conversation',
+      messages: [],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    // Update UI immediately
+    setConversations(prev => [optimisticConversation, ...prev]);
+    setActiveConversation(optimisticConversation);
+    toast.success('Conversation created!');
+
+    // Create in background
     try {
       const { data, error } = await supabase
         .from('ai_conversations')
@@ -80,12 +104,22 @@ export function AIAssistant() {
         .select()
         .single();
 
-      if (error) throw error;
-      
-      setConversations(prev => [data, ...prev]);
+      if (error) {
+        console.error('Error creating conversation:', error);
+        // Revert optimistic update
+        setConversations(prev => prev.filter(c => c.id !== tempId));
+        setActiveConversation(null);
+        toast.error('Failed to save conversation');
+        return;
+      }
+
+      // Replace temp conversation with real one
+      setConversations(prev => prev.map(c => c.id === tempId ? data : c));
       setActiveConversation(data);
-    } catch (error) {
-      console.error('Error creating conversation:', error);
+    } catch {
+      // Revert optimistic update
+      setConversations(prev => prev.filter(c => c.id !== tempId));
+      setActiveConversation(null);
       toast.error('Failed to create conversation');
     }
   };
@@ -99,8 +133,12 @@ export function AIAssistant() {
         .delete()
         .eq('id', conversationId);
 
-      if (error) throw error;
-      
+      if (error) {
+        console.error('Error deleting conversation:', error);
+        toast.error('Failed to delete conversation');
+        return;
+      }
+
       setConversations(prev => prev.filter(c => c.id !== conversationId));
       
       if (activeConversation?.id === conversationId) {
@@ -109,8 +147,7 @@ export function AIAssistant() {
       }
       
       toast.success('Conversation deleted');
-    } catch (error) {
-      console.error('Error deleting conversation:', error);
+    } catch {
       toast.error('Failed to delete conversation');
     }
   };
@@ -178,7 +215,7 @@ export function AIAssistant() {
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
@@ -187,11 +224,8 @@ export function AIAssistant() {
 
   if (loadingConversations) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-dark-base via-dark-elevated to-dark-base">
-        <div className="relative">
-          <div className="animate-spin rounded-full h-16 w-16 border-4 border-neon-blue/30 border-t-neon-blue"></div>
-          <div className="absolute inset-0 rounded-full bg-neon-blue/20 blur-xl animate-pulse-glow"></div>
-        </div>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <LoadingAnimation variant="spin" size="md" text="Loading AI Assistant..." />
       </div>
     );
   }
@@ -430,7 +464,7 @@ export function AIAssistant() {
                   <textarea
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
-                    onKeyPress={handleKeyPress}
+                    onKeyDown={handleKeyDown}
                     placeholder="Ask me anything..."
                     disabled={loading}
                     rows={3}

@@ -104,10 +104,10 @@ export function LoginForm({ onBackToLanding }: LoginFormProps) {
 					setIsLogin(true);
 				}
 			}
-		} catch (error: any) {
+		} catch (error) {
 			console.error('Authentication error:', error);
 			// Show the ACTUAL error message from Supabase
-			const errorMessage = error?.message || error?.error_description || 'An error occurred during authentication';
+			const errorMessage = error instanceof Error ? error.message : 'An error occurred during authentication';
 			console.error('Displaying error:', errorMessage);
 			toast.error(errorMessage);
 		} finally {
@@ -126,9 +126,10 @@ export function LoginForm({ onBackToLanding }: LoginFormProps) {
 				toast.error('Failed to initiate Google sign-in');
 				setGoogleLoading(false);
 			}
-		} catch (error: any) {
+		} catch (error) {
 			console.error('Google sign-in error:', error);
-			toast.error(error.message || 'Failed to sign in with Google');
+			const errorMessage = error instanceof Error ? error.message : 'Failed to sign in with Google';
+			toast.error(errorMessage);
 			setGoogleLoading(false);
 		}
 	};
@@ -152,30 +153,30 @@ export function LoginForm({ onBackToLanding }: LoginFormProps) {
 	const isFormDisabled = loading || googleLoading;
 
 	return (
-		<div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black overflow-hidden">
+		<div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black overflow-x-hidden">
 			{/* Animated background elements */}
-			<div className="absolute inset-0 overflow-hidden">
-				<div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
-				<div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
-				<div className="absolute top-40 left-40 w-80 h-80 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
+			<div className="absolute inset-0 overflow-hidden pointer-events-none">
+				<div className="absolute -top-40 -right-40 w-60 sm:w-80 h-60 sm:h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
+				<div className="absolute -bottom-40 -left-40 w-60 sm:w-80 h-60 sm:h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
+				<div className="absolute top-40 left-40 w-60 sm:w-80 h-60 sm:h-80 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
 			</div>
 
 			{/* Back to Landing Button */}
 			{onBackToLanding && (
-				<div className="absolute top-6 right-6 z-50 lg:left-6 lg:right-auto">
+				<div className="absolute top-3 right-3 sm:top-4 sm:right-4 md:top-6 md:right-6 z-50 lg:left-6 lg:right-auto">
 					<button
 						onClick={onBackToLanding}
-						className="flex items-center space-x-2 px-4 py-2.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white hover:bg-white/20 transition-all shadow-lg hover:shadow-xl"
+						className="flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg sm:rounded-xl text-white hover:bg-white/20 transition-all shadow-lg hover:shadow-xl text-sm"
 					>
-						<ArrowLeft className="w-4 h-4" />
-						<span className="text-sm font-medium">Back to Home</span>
+						<ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+						<span className="text-xs sm:text-sm font-medium">Back to Home</span>
 					</button>
 				</div>
 			)}
 
 			<div className="relative min-h-screen flex">
 				{/* Left side - Features showcase */}
-				<div className="hidden lg:flex lg:w-1/2 xl:w-3/5 flex-col justify-center px-12 xl:px-20 pt-20">
+				<div className="hidden lg:flex lg:w-1/2 xl:w-3/5 flex-col justify-center px-8 xl:px-12 2xl:px-20 pt-20 overflow-y-auto">
 					<motion.div
 						initial={{ opacity: 0, x: -50 }}
 						animate={{ opacity: 1, x: 0 }}
@@ -249,7 +250,7 @@ export function LoginForm({ onBackToLanding }: LoginFormProps) {
 				</div>
 
 				{/* Right side - Login form */}
-				<div className="w-full lg:w-1/2 xl:w-2/5 flex items-center justify-center px-6 py-12">
+				<div className="w-full lg:w-1/2 xl:w-2/5 flex items-center justify-center px-4 sm:px-6 md:px-8 py-8 sm:py-12">
 					<motion.div
 						initial={{ opacity: 0, y: 20 }}
 						animate={{ opacity: 1, y: 0 }}
@@ -257,14 +258,14 @@ export function LoginForm({ onBackToLanding }: LoginFormProps) {
 						className="w-full max-w-md"
 					>
 						{/* Mobile logo */}
-						<div className="lg:hidden text-center mb-8 mt-12">
-							<div className="inline-flex items-center space-x-3 mb-4">
-								<div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-2xl overflow-hidden bg-white">
+						<div className="lg:hidden text-center mb-6 sm:mb-8 mt-8 sm:mt-12">
+							<div className="inline-flex items-center space-x-2 sm:space-x-3 mb-4">
+								<div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-2xl overflow-hidden bg-white flex-shrink-0">
 									<img src="/logo.png" alt="ORBIT LIVE TEAM" className="w-full h-full object-contain" />
 								</div>
-								<div className="text-left">
-									<h1 className="text-2xl font-bold text-white">ORBIT LIVE TEAM</h1>
-									<p className="text-xs text-gray-400">AI-Powered Management</p>
+								<div className="text-left min-w-0">
+									<h1 className="text-xl sm:text-2xl font-bold text-white truncate">ORBIT LIVE TEAM</h1>
+									<p className="text-xs text-gray-400 truncate">AI-Powered Management</p>
 								</div>
 							</div>
 
@@ -273,18 +274,18 @@ export function LoginForm({ onBackToLanding }: LoginFormProps) {
 								initial={{ opacity: 0, y: 20 }}
 								animate={{ opacity: 1, y: 0 }}
 								transition={{ duration: 0.6, delay: 0.2 }}
-								className="mb-6"
+								className="mb-4 sm:mb-6 overflow-hidden"
 							>
 								<FeaturesTrain />
 							</motion.div>
 						</div>
 
-						<div className="bg-gray-800/50 backdrop-blur-xl rounded-3xl shadow-2xl border border-gray-700/50 p-8">
-							<div className="text-center mb-8">
-								<h2 className="text-3xl font-bold text-white mb-2">
+						<div className="bg-gray-800/50 backdrop-blur-xl rounded-2xl sm:rounded-3xl shadow-2xl border border-gray-700/50 p-4 sm:p-6 md:p-8">
+							<div className="text-center mb-6 sm:mb-8">
+								<h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">
 									{isLogin ? 'Welcome Back' : 'Get Started'}
 								</h2>
-								<p className="text-gray-400">
+								<p className="text-sm sm:text-base text-gray-400">
 									{isLogin ? 'Sign in to continue your journey' : 'Create your account in seconds'}
 								</p>
 							</div>

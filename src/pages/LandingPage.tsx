@@ -56,17 +56,17 @@ const Hero = ({ onGetStarted }: { onGetStarted: () => void }) => {
 
       <motion.div
         style={{ y, opacity }}
-        className="relative z-10 max-w-6xl mx-auto px-4 text-center"
+        className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 md:px-8 text-center"
       >
         {/* Badge */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full mb-8"
+          className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full mb-6 sm:mb-8"
         >
-          <Rocket className="w-4 h-4 text-indigo-400" />
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <Rocket className="w-3 h-3 sm:w-4 sm:h-4 text-indigo-400 flex-shrink-0" />
+          <span className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
             Trusted by 10,000+ teams worldwide
           </span>
         </motion.div>
@@ -76,7 +76,7 @@ const Hero = ({ onGetStarted }: { onGetStarted: () => void }) => {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.1 }}
-          className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight mb-6"
+          className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl xl:text-8xl font-bold tracking-tight mb-4 sm:mb-6 px-2"
         >
           <span className="text-gray-900 dark:text-white">The AI-Powered</span>
           <br />
@@ -90,7 +90,7 @@ const Hero = ({ onGetStarted }: { onGetStarted: () => void }) => {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.3 }}
-          className="text-xl md:text-2xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-12 leading-relaxed"
+          className="text-base sm:text-lg md:text-xl lg:text-2xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-8 sm:mb-12 leading-relaxed px-2"
         >
           Transform chaos into clarity. ORBIT LIVE uses advanced AI to automate workflows,
           predict bottlenecks, and keep your team aligned—effortlessly.
@@ -101,16 +101,16 @@ const Hero = ({ onGetStarted }: { onGetStarted: () => void }) => {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.5 }}
-          className="flex items-center justify-center"
+          className="flex items-center justify-center px-4"
         >
           <motion.button
             onClick={onGetStarted}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="group px-12 py-5 bg-indigo-600 text-white font-semibold rounded-xl shadow-lg hover:bg-indigo-700 transition-all flex items-center gap-2 text-lg"
+            className="group px-6 sm:px-8 md:px-12 py-3 sm:py-4 md:py-5 bg-indigo-600 text-white font-semibold rounded-lg sm:rounded-xl shadow-lg hover:bg-indigo-700 transition-all flex items-center gap-2 text-sm sm:text-base md:text-lg whitespace-nowrap"
           >
             Start Free Trial
-            <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
+            <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 group-hover:translate-x-1 transition-transform" />
           </motion.button>
         </motion.div>
 
@@ -119,7 +119,7 @@ const Hero = ({ onGetStarted }: { onGetStarted: () => void }) => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 1, delay: 0.8 }}
-          className="mt-20 grid grid-cols-3 gap-8 max-w-3xl mx-auto"
+          className="mt-12 sm:mt-16 md:mt-20 grid grid-cols-3 gap-4 sm:gap-6 md:gap-8 max-w-3xl mx-auto px-4"
         >
           {[
             { value: "10K+", label: "Active Teams" },
@@ -127,10 +127,10 @@ const Hero = ({ onGetStarted }: { onGetStarted: () => void }) => {
             { value: "99.9%", label: "Uptime" }
           ].map((stat, i) => (
             <div key={i} className="text-center">
-              <div className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-1">
+              <div className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-1">
                 {stat.value}
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
+              <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                 {stat.label}
               </div>
             </div>
@@ -414,40 +414,40 @@ const Pricing = ({ onGetStarted }: { onGetStarted: () => void }) => {
               className={`relative ${plan.popular ? 'md:scale-105' : ''}`}
             >
               {plan.popular && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-indigo-600 text-white text-sm font-bold rounded-full">
+                <div className="absolute -top-3 sm:-top-4 left-1/2 -translate-x-1/2 px-3 sm:px-4 py-1 bg-indigo-600 text-white text-xs sm:text-sm font-bold rounded-full whitespace-nowrap">
                   Most Popular
                 </div>
               )}
 
-              <div className={`bg-white dark:bg-gray-800 p-8 rounded-2xl border-2 ${plan.popular ? 'border-indigo-600' : 'border-gray-200 dark:border-gray-700'} h-full flex flex-col`}>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              <div className={`bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-xl sm:rounded-2xl border-2 ${plan.popular ? 'border-indigo-600' : 'border-gray-200 dark:border-gray-700'} h-full flex flex-col`}>
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2">
                   {plan.name}
                 </h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-6">
+                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-6">
                   {plan.description}
                 </p>
 
                 <div className="mb-6">
-                  <span className="text-5xl font-bold text-gray-900 dark:text-white">
+                  <span className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 dark:text-white">
                     {plan.price}
                   </span>
-                  <span className="text-gray-600 dark:text-gray-400 ml-2">
+                  <span className="text-sm sm:text-base text-gray-600 dark:text-gray-400 ml-2 block sm:inline mt-1 sm:mt-0">
                     {plan.period}
                   </span>
                 </div>
 
-                <ul className="space-y-4 mb-8 flex-grow">
+                <ul className="space-y-3 sm:space-y-4 mb-6 sm:mb-8 flex-grow">
                   {plan.features.map((feature, idx) => (
-                    <li key={idx} className="flex items-start gap-3">
-                      <CheckCircle className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" />
-                      <span className="text-gray-700 dark:text-gray-300">{feature}</span>
+                    <li key={idx} className="flex items-start gap-2 sm:gap-3">
+                      <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600 flex-shrink-0 mt-0.5" />
+                      <span className="text-sm sm:text-base text-gray-700 dark:text-gray-300">{feature}</span>
                     </li>
                   ))}
                 </ul>
 
                 <button
                   onClick={onGetStarted}
-                  className={`w-full py-3 rounded-xl font-semibold transition-all ${
+                  className={`w-full py-3 rounded-xl font-semibold transition-all touch-manipulation text-sm sm:text-base ${
                     plan.popular
                       ? 'bg-indigo-600 text-white hover:bg-indigo-700'
                       : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600'
@@ -466,57 +466,57 @@ const Pricing = ({ onGetStarted }: { onGetStarted: () => void }) => {
 
 // CTA Section
 const CTA = ({ onGetStarted }: { onGetStarted: () => void }) => (
-  <section id="cta" className="py-32 relative overflow-hidden">
+  <section id="cta" className="py-16 sm:py-24 md:py-32 relative overflow-hidden">
     {/* Background */}
     <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600" />
     <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRjMC0yIDItNCAyLTRzLTIgMi00IDJjMCAwIDIgMiA0IDJ6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-20" />
 
-    <div className="relative z-10 max-w-4xl mx-auto px-4 text-center">
+    <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 md:px-8 text-center">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ duration: 0.6 }}
       >
-        <h2 className="text-5xl md:text-6xl font-bold text-white mb-6">
+        <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 sm:mb-6 px-2">
           Ready to Transform Your Workflow?
         </h2>
-        <p className="text-xl text-white/90 mb-12 max-w-2xl mx-auto">
+        <p className="text-base sm:text-lg md:text-xl text-white/90 mb-8 sm:mb-12 max-w-2xl mx-auto px-4">
           Join 10,000+ teams already using ORBIT LIVE to work smarter, faster, and better together.
         </p>
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 px-4">
           <motion.button
             onClick={onGetStarted}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="group px-8 py-4 bg-white text-indigo-600 font-semibold rounded-xl shadow-lg hover:shadow-2xl transition-all flex items-center gap-2"
+            className="group w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-white text-indigo-600 font-semibold rounded-xl shadow-lg hover:shadow-2xl transition-all flex items-center justify-center gap-2 touch-manipulation text-sm sm:text-base"
           >
             Start Free Trial
-            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform flex-shrink-0" />
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="px-8 py-4 bg-white/10 backdrop-blur-sm text-white font-semibold rounded-xl border border-white/20 hover:bg-white/20 transition-all"
+            className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-white/10 backdrop-blur-sm text-white font-semibold rounded-xl border border-white/20 hover:bg-white/20 transition-all touch-manipulation text-sm sm:text-base"
           >
             Talk to Sales
           </motion.button>
         </div>
 
         {/* Trust Indicators */}
-        <div className="mt-16 flex items-center justify-center gap-8 text-white/80">
+        <div className="mt-10 sm:mt-16 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6 md:gap-8 text-white/80 px-4">
           <div className="flex items-center gap-2">
-            <CheckCircle className="w-5 h-5" />
-            <span>No credit card required</span>
+            <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+            <span className="text-xs sm:text-sm md:text-base">No credit card required</span>
           </div>
           <div className="flex items-center gap-2">
-            <Clock className="w-5 h-5" />
-            <span>14-day free trial</span>
+            <Clock className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+            <span className="text-xs sm:text-sm md:text-base">14-day free trial</span>
           </div>
           <div className="flex items-center gap-2">
-            <Lock className="w-5 h-5" />
-            <span>Cancel anytime</span>
+            <Lock className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+            <span className="text-xs sm:text-sm md:text-base">Cancel anytime</span>
           </div>
         </div>
       </motion.div>
@@ -527,51 +527,51 @@ const CTA = ({ onGetStarted }: { onGetStarted: () => void }) => (
 // Footer
 const Footer = () => (
   <footer className="border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-    <div className="max-w-7xl mx-auto px-4 py-12">
-      <div className="grid md:grid-cols-4 gap-8 mb-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-8 sm:py-12">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 mb-8">
         {/* Company Info */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center">
-              <Rocket className="w-5 h-5 text-white" />
+        <div className="col-span-2 md:col-span-1">
+          <div className="flex items-center gap-2 mb-3 sm:mb-4">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center">
+              <Rocket className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
-            <span className="font-bold text-lg text-gray-900 dark:text-white">ORBIT LIVE</span>
+            <span className="font-bold text-base sm:text-lg text-gray-900 dark:text-white">ORBIT LIVE</span>
           </div>
-          <p className="text-gray-600 dark:text-gray-400 text-sm">
+          <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm">
             The AI-powered workspace that transforms how teams collaborate and achieve goals.
           </p>
         </div>
 
         {/* Product */}
         <div>
-          <h4 className="font-semibold text-gray-900 dark:text-white mb-4">Product</h4>
+          <h4 className="font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4 text-sm sm:text-base">Product</h4>
           <ul className="space-y-2">
-            <li><a href="#features" className="text-gray-600 dark:text-gray-400 hover:text-indigo-600 text-sm">Features</a></li>
-            <li><a href="#pricing" className="text-gray-600 dark:text-gray-400 hover:text-indigo-600 text-sm">Pricing</a></li>
-            <li><a href="#" className="text-gray-600 dark:text-gray-400 hover:text-indigo-600 text-sm">Integrations</a></li>
-            <li><a href="#" className="text-gray-600 dark:text-gray-400 hover:text-indigo-600 text-sm">Changelog</a></li>
+            <li><a href="#features" className="text-gray-600 dark:text-gray-400 hover:text-indigo-600 text-xs sm:text-sm transition-colors">Features</a></li>
+            <li><a href="#pricing" className="text-gray-600 dark:text-gray-400 hover:text-indigo-600 text-xs sm:text-sm transition-colors">Pricing</a></li>
+            <li><a href="#" className="text-gray-600 dark:text-gray-400 hover:text-indigo-600 text-xs sm:text-sm transition-colors">Integrations</a></li>
+            <li><a href="#" className="text-gray-600 dark:text-gray-400 hover:text-indigo-600 text-xs sm:text-sm transition-colors">Changelog</a></li>
           </ul>
         </div>
 
         {/* Company */}
         <div>
-          <h4 className="font-semibold text-gray-900 dark:text-white mb-4">Company</h4>
+          <h4 className="font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4 text-sm sm:text-base">Company</h4>
           <ul className="space-y-2">
-            <li><a href="#" className="text-gray-600 dark:text-gray-400 hover:text-indigo-600 text-sm">About Us</a></li>
-            <li><a href="#" className="text-gray-600 dark:text-gray-400 hover:text-indigo-600 text-sm">Careers</a></li>
-            <li><a href="#" className="text-gray-600 dark:text-gray-400 hover:text-indigo-600 text-sm">Blog</a></li>
-            <li><a href="#" className="text-gray-600 dark:text-gray-400 hover:text-indigo-600 text-sm">Contact</a></li>
+            <li><a href="#" className="text-gray-600 dark:text-gray-400 hover:text-indigo-600 text-xs sm:text-sm transition-colors">About Us</a></li>
+            <li><a href="#" className="text-gray-600 dark:text-gray-400 hover:text-indigo-600 text-xs sm:text-sm transition-colors">Careers</a></li>
+            <li><a href="#" className="text-gray-600 dark:text-gray-400 hover:text-indigo-600 text-xs sm:text-sm transition-colors">Blog</a></li>
+            <li><a href="#" className="text-gray-600 dark:text-gray-400 hover:text-indigo-600 text-xs sm:text-sm transition-colors">Contact</a></li>
           </ul>
         </div>
 
         {/* Legal */}
         <div>
-          <h4 className="font-semibold text-gray-900 dark:text-white mb-4">Legal</h4>
+          <h4 className="font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4 text-sm sm:text-base">Legal</h4>
           <ul className="space-y-2">
-            <li><a href="#privacy" className="text-gray-600 dark:text-gray-400 hover:text-indigo-600 text-sm">Privacy Policy</a></li>
-            <li><a href="#terms" className="text-gray-600 dark:text-gray-400 hover:text-indigo-600 text-sm">Terms of Service</a></li>
-            <li><a href="#" className="text-gray-600 dark:text-gray-400 hover:text-indigo-600 text-sm">Cookie Policy</a></li>
-            <li><a href="#" className="text-gray-600 dark:text-gray-400 hover:text-indigo-600 text-sm">Security</a></li>
+            <li><a href="#privacy" className="text-gray-600 dark:text-gray-400 hover:text-indigo-600 text-xs sm:text-sm transition-colors">Privacy Policy</a></li>
+            <li><a href="#terms" className="text-gray-600 dark:text-gray-400 hover:text-indigo-600 text-xs sm:text-sm transition-colors">Terms of Service</a></li>
+            <li><a href="#" className="text-gray-600 dark:text-gray-400 hover:text-indigo-600 text-xs sm:text-sm transition-colors">Cookie Policy</a></li>
+            <li><a href="#" className="text-gray-600 dark:text-gray-400 hover:text-indigo-600 text-xs sm:text-sm transition-colors">Security</a></li>
           </ul>
         </div>
       </div>
@@ -634,59 +634,59 @@ export const LandingPage = memo(function LandingPage({ onGetStarted }: LandingPa
             : 'bg-transparent'
         }`}
       >
-        <nav className="max-w-7xl mx-auto px-4 py-4">
+        <nav className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-3 sm:py-4">
           <div className="flex justify-between items-center">
             {/* Logo - Clickable to scroll to top */}
             <motion.button
               onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="flex items-center gap-2 cursor-pointer"
+              className="flex items-center gap-2 cursor-pointer flex-shrink-0"
             >
               <motion.div
-                className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center"
+                className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-lg sm:rounded-xl flex items-center justify-center"
                 whileHover={{ rotate: 360 }}
                 transition={{ duration: 0.6 }}
               >
-                <Rocket className="w-6 h-6 text-white" />
+                <Rocket className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               </motion.div>
-              <span className="font-bold text-xl text-gray-900 dark:text-white">
+              <span className="font-bold text-base sm:text-lg md:text-xl text-gray-900 dark:text-white whitespace-nowrap">
                 ORBIT LIVE
               </span>
             </motion.button>
 
-            {/* Navigation Links - Clickable with smooth scroll */}
-            <div className="hidden md:flex items-center gap-8">
+            {/* Navigation Links - Hidden on mobile */}
+            <div className="hidden lg:flex items-center gap-6 xl:gap-8">
               <motion.button
                 onClick={() => scrollToSection('features')}
-                whileHover={{ scale: 1.05, color: '#4F46E5' }}
-                className="text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-colors"
+                whileHover={{ scale: 1.05 }}
+                className="text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-colors text-sm"
               >
                 Features
               </motion.button>
               <motion.button
                 onClick={() => scrollToSection('pricing')}
-                whileHover={{ scale: 1.05, color: '#4F46E5' }}
-                className="text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-colors"
+                whileHover={{ scale: 1.05 }}
+                className="text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-colors text-sm"
               >
                 Pricing
               </motion.button>
               <motion.button
                 onClick={() => scrollToSection('cta')}
-                whileHover={{ scale: 1.05, color: '#4F46E5' }}
-                className="text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-colors"
+                whileHover={{ scale: 1.05 }}
+                className="text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-colors text-sm"
               >
                 About
               </motion.button>
             </div>
 
             {/* CTA Buttons */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
               <motion.button
                 onClick={onGetStarted}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-colors"
+                className="hidden sm:block text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-colors text-sm"
               >
                 Login
               </motion.button>
@@ -694,7 +694,7 @@ export const LandingPage = memo(function LandingPage({ onGetStarted }: LandingPa
                 onClick={onGetStarted}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="px-6 py-2.5 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition-colors shadow-lg"
+                className="px-4 sm:px-6 py-2 sm:py-2.5 bg-indigo-600 text-white font-semibold rounded-lg sm:rounded-xl hover:bg-indigo-700 transition-colors shadow-lg text-xs sm:text-sm whitespace-nowrap touch-manipulation"
               >
                 Sign Up Free
               </motion.button>

@@ -3,6 +3,7 @@ import { Upload, Search, Download, Trash2, FileText, Image, Video, Archive, File
 import { supabase } from '../lib/supabase';
 import { useGroup } from '../hooks/useGroup';
 import { useAuth } from '../hooks/useAuth';
+import { LoadingAnimation } from '../components/Shared/LoadingAnimation';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { motion } from 'framer-motion';
@@ -147,8 +148,18 @@ export function Documents() {
     }
   };
 
-  // Download file
+  // Download file - Optimized for instant response
   const handleDownload = async (document: Document) => {
+    // Show immediate feedback
+    toast.loading('Downloading...', { id: document.id });
+
+    // Update UI immediately (optimistic update)
+    setDocuments(prev => prev.map(doc =>
+      doc.id === document.id
+        ? { ...doc, download_count: doc.download_count + 1 }
+        : doc
+    ));
+
     try {
       const { data, error } = await supabase.storage
         .from('documents')
@@ -165,20 +176,21 @@ export function Documents() {
       window.document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      await supabase.rpc('increment_download_count', {
+      // Update count in background
+      supabase.rpc('increment_download_count', {
         document_id: document.id
       });
 
-      setDocuments(prev => prev.map(doc =>
-        doc.id === document.id
-          ? { ...doc, download_count: doc.download_count + 1 }
-          : doc
-      ));
-
-      toast.success('Document downloaded!');
+      toast.success('Downloaded!', { id: document.id });
     } catch (error: unknown) {
       console.error('Download error:', error);
-      toast.error('Failed to download document');
+      // Revert optimistic update
+      setDocuments(prev => prev.map(doc =>
+        doc.id === document.id
+          ? { ...doc, download_count: doc.download_count - 1 }
+          : doc
+      ));
+      toast.error('Download failed', { id: document.id });
     }
   };
 
@@ -245,11 +257,8 @@ export function Documents() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-dark-base via-dark-elevated to-dark-base">
-        <div className="relative">
-          <div className="animate-spin rounded-full h-16 w-16 border-4 border-neon-blue/30 border-t-neon-blue"></div>
-          <div className="absolute inset-0 rounded-full bg-neon-blue/20 blur-xl animate-pulse-glow"></div>
-        </div>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <LoadingAnimation variant="spin" size="md" text="Loading Documents..." />
       </div>
     );
   }

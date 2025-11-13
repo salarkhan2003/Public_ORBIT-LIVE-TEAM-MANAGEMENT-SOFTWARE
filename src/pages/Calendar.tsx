@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { Meeting, Group } from '../types';
 import { useGroup } from '../hooks/useGroup';
 import { useAuth } from '../hooks/useAuth';
+import { LoadingAnimation } from '../components/Shared/LoadingAnimation';
 import toast from 'react-hot-toast';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths, startOfWeek, endOfWeek } from 'date-fns';
 import { motion } from 'framer-motion';
@@ -81,8 +82,8 @@ export function Calendar() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <LoadingAnimation variant="bars" size="md" text="Loading Calendar..." />
       </div>
     );
   }

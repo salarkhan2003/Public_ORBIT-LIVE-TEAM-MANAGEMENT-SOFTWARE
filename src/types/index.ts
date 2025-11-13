@@ -8,6 +8,7 @@ export interface User {
   position?: string;
   department?: string;
   phone?: string;
+  custom_roles?: string[];
   bio?: string;
   skills?: string[];
   location?: string;
@@ -40,7 +41,7 @@ export interface Project {
   id: string;
   name: string;
   description: string;
-  status: 'active' | 'completed' | 'on_hold';
+  status: 'started' | 'in_progress' | 'need_time' | 'completed' | 'active' | 'on_hold';
   created_by: string;
   group_id: string;
   created_at: string;
@@ -48,6 +49,9 @@ export interface Project {
   deadline?: string;
   progress: number;
   team_members: string[];
+  start_date?: string;
+  end_date?: string;
+  budget?: number;
 }
 
 export interface Task {
@@ -57,7 +61,7 @@ export interface Task {
   project_id: string;
   assigned_to?: string;
   created_by: string;
-  status: 'todo' | 'in_progress' | 'done';
+  status: 'started' | 'in_progress' | 'need_time' | 'completed' | 'todo' | 'done';
   priority: 'low' | 'medium' | 'high';
   deadline?: string;
   created_at: string;
@@ -156,8 +160,8 @@ export interface UserSettings {
   id: string;
   user_id: string;
   setting_key: string;
-  setting_value: any;
-  setting_type: 'theme' | 'notifications' | 'privacy' | 'integrations';
+  setting_value: string | boolean | number;
+  setting_type: 'notification' | 'privacy' | 'appearance' | 'preference';
   created_at: string;
   updated_at: string;
 }
