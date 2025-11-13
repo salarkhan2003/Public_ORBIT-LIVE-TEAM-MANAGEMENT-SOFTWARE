@@ -3,6 +3,9 @@
 @tailwind utilities;
 
 @layer base {
+  /* Import Google Fonts */
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+
   /* Optimize for mobile performance */
   * {
     -webkit-tap-highlight-color: transparent;
@@ -13,15 +16,89 @@
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
   body {
     overscroll-behavior: none;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  /* Dark mode base colors - ElevenLabs inspired */
+  .dark body {
+    background: #0E0E10;
+    color: #FFFFFF;
+  }
+
+  /* Light mode base colors */
+  body {
+    background: #FFFFFF;
+    color: #0E0E10;
   }
 
   /* Improve touch interactions */
   button, a, input, textarea, select {
     touch-action: manipulation;
+  }
+}
+
+@layer components {
+  /* Glass Card - Luma inspired */
+  .glass-card {
+    @apply bg-white/10 backdrop-blur-xl border border-white/20 shadow-glass;
+  }
+
+  .dark .glass-card {
+    @apply bg-black/20 backdrop-blur-xl border border-white/10;
+  }
+
+  /* Neon Button - ElevenLabs inspired */
+  .neon-button {
+    @apply relative overflow-hidden bg-gradient-to-r from-neon-blue to-neon-cyan text-white font-semibold px-6 py-3 rounded-xl shadow-glow transition-all duration-300;
+  }
+
+  .neon-button:hover {
+    @apply shadow-glow-lg scale-105;
+  }
+
+  /* Gradient Text */
+  .gradient-text {
+    @apply bg-gradient-to-r from-neon-blue via-neon-magenta to-neon-orange bg-clip-text text-transparent;
+  }
+
+  /* Floating Card - Luma style */
+  .floating-card {
+    @apply rounded-3xl shadow-elegant hover:shadow-2xl transform hover:-translate-y-2 transition-all duration-300;
+  }
+
+  /* Glow Effect */
+  .glow-effect {
+    @apply relative;
+  }
+
+  .glow-effect::before {
+    content: '';
+    @apply absolute inset-0 rounded-full opacity-0 transition-opacity duration-300;
+    background: radial-gradient(circle, rgba(45, 156, 219, 0.4) 0%, transparent 70%);
+    filter: blur(20px);
+  }
+
+  .glow-effect:hover::before {
+    @apply opacity-100;
+  }
+
+  /* Cinematic Card */
+  .cinematic-card {
+    @apply relative overflow-hidden rounded-2xl;
+    background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+
+  .dark .cinematic-card {
+    background: linear-gradient(135deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.2) 100%);
+    border: 1px solid rgba(255,255,255,0.05);
   }
 }
 
@@ -42,6 +119,7 @@
   .gpu-accelerated {
     transform: translateZ(0);
     will-change: transform;
+    backface-visibility: hidden;
   }
 
   /* Smooth scrolling */
@@ -59,6 +137,49 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
+  /* Custom Scrollbar - Dark Mode */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-gray-400 dark:bg-gray-600 rounded-full;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-500 dark:bg-gray-500;
+  }
+
+  /* Text Selection */
+  ::selection {
+    @apply bg-neon-blue/30 text-white;
+  }
+
+  /* Glassmorphism variations */
+  .glass-light {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .glass-dark {
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  /* Ambient gradient animation */
+  .ambient-gradient {
+    background: linear-gradient(-45deg, #2D9CDB, #BB6BD9, #FF6F61, #56CCF2);
+    background-size: 400% 400%;
+    animation: gradient 15s ease infinite;
+  }
 }
 
 /* Loading spinner optimization */
@@ -72,7 +193,7 @@
   animation: spin 1s linear infinite;
 }
 
-/* Blob animation for landing page */
+/* Blob animation for landing page - Luma style */
 @keyframes blob {
   0%, 100% {
     transform: translate(0, 0) scale(1);
@@ -97,6 +218,24 @@
   animation-delay: 4s;
 }
 
+/* Particle effect */
+@keyframes particle-float {
+  0%, 100% {
+    transform: translateY(0) translateX(0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-100vh) translateX(50px) rotate(360deg);
+    opacity: 0;
+  }
+}
+
 /* Responsive utilities for mobile-first design */
 @media (max-width: 640px) {
   /* Reduce motion for better performance on mobile */
@@ -110,3 +249,54 @@
     }
   }
 }
+
+/* Focus styles - Accessibility */
+*:focus-visible {
+  @apply outline-none ring-2 ring-neon-blue ring-offset-2 ring-offset-white dark:ring-offset-dark-base;
+}
+
+/* Button hover effects - ElevenLabs style */
+.btn-hover-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-hover-effect::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.btn-hover-effect:hover::before {
+  width: 300px;
+  height: 300px;
+}
+
+/* Shimmer effect for loading states */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
