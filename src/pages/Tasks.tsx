@@ -6,6 +6,7 @@ import { useGroup } from '../hooks/useGroup';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { motion } from 'framer-motion';
+import { TaskModal } from '../components/Tasks/TaskModal';
 
 export function Tasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -366,37 +367,16 @@ export function Tasks() {
         )}
       </div>
 
-      {/* Simple Modal Placeholders */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-md w-full">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Create Task</h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">Task creation modal coming soon!</p>
-            <button
-              onClick={() => setShowCreateModal(false)}
-              className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
-
-      {editingTask && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-md w-full">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Edit Task</h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-2">Editing: {editingTask.title}</p>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">Task edit modal coming soon!</p>
-            <button
-              onClick={() => setEditingTask(null)}
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Task Create/Edit Modal */}
+      <TaskModal
+        isOpen={showCreateModal || editingTask !== null}
+        onClose={() => {
+          setShowCreateModal(false);
+          setEditingTask(null);
+        }}
+        task={editingTask}
+        onSuccess={fetchTasks}
+      />
 
       {deletingTask && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">

@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Upload, Search, Download, Trash2, FileText, Image, Video, Archive, File, X } from 'lucide-react';
+import { Upload, Search, Download, Trash2, FileText, Image, Video, Archive, File, X, Edit } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useGroup } from '../hooks/useGroup';
 import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { motion } from 'framer-motion';
+import { DocumentEditModal } from '../components/Documents/DocumentEditModal';
 
 interface Document {
   id: string;
@@ -37,6 +38,7 @@ export function Documents() {
   const [uploadTitle, setUploadTitle] = useState('');
   const [uploadDescription, setUploadDescription] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [editingDocument, setEditingDocument] = useState<Document | null>(null);
   const { currentGroup } = useGroup();
   const { user } = useAuth();
 
@@ -253,103 +255,91 @@ export function Documents() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-light-base via-light-elevated to-light-base dark:from-dark-base dark:via-dark-elevated dark:to-dark-base transition-colors duration-300">
-      {/* Ambient Background Effects */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-neon-blue/10 rounded-full blur-3xl animate-float"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-neon-magenta/10 rounded-full blur-3xl animate-float animation-delay-2000"></div>
-      </div>
+    <div className="min-h-screen bg-light-base dark:bg-dark-base transition-colors duration-300">
 
       <div className="relative z-10 space-y-8 p-6 md:p-8 max-w-7xl mx-auto">
         {/* Hero Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative"
+          className="relative p-8 md:p-12 rounded-2xl bg-gray-100 dark:bg-gray-800"
         >
-          <div className="cinematic-card p-8 md:p-12 overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-neon-blue/20 to-neon-magenta/20 rounded-full blur-3xl"></div>
-            <div className="absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-neon-orange/20 to-neon-cyan/20 rounded-full blur-3xl"></div>
-
-            <div className="relative z-10">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-                <div className="space-y-3">
-                  <motion.h1
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.1 }}
-                    className="text-4xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tight"
-                  >
-                    Documents
-                  </motion.h1>
-                  <motion.p
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="text-lg text-gray-600 dark:text-gray-300 flex items-center gap-3"
-                  >
-                    <span className="font-semibold text-neon-blue">{stats.total} files</span>
-                    <span className="text-gray-400">•</span>
-                    <span className="font-semibold text-neon-magenta">{formatFileSize(stats.totalSize)}</span>
-                  </motion.p>
-                </div>
-
-                <motion.label
-                  htmlFor="file-upload"
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.3 }}
-                  whileHover={{ scale: 1.05, y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="relative group cursor-pointer"
+          <div className="relative z-10">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+              <div className="space-y-3">
+                <motion.h1
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white tracking-tight"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-r from-neon-blue to-neon-cyan rounded-2xl blur-lg opacity-50 group-hover:opacity-75 transition-opacity"></div>
-                  <div className="relative flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-neon-blue to-neon-cyan text-white rounded-2xl font-semibold shadow-glow transition-all">
-                    <Upload className="w-5 h-5" />
-                    <span>Upload Document</span>
-                  </div>
-                  <input
-                    id="file-upload"
-                    type="file"
-                    onChange={handleFileSelect}
-                    className="hidden"
-                    accept="*/*"
-                  />
-                </motion.label>
+                  Documents
+                </motion.h1>
+                <motion.p
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="text-lg text-gray-600 dark:text-gray-300 flex items-center gap-3"
+                >
+                  <span className="font-semibold text-indigo-600 dark:text-indigo-400">{stats.total} files</span>
+                  <span className="text-gray-400">•</span>
+                  <span className="font-semibold text-indigo-600 dark:text-indigo-400">{formatFileSize(stats.totalSize)}</span>
+                </motion.p>
               </div>
 
-              {/* Stats Grid */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8"
+              <motion.label
+                htmlFor="file-upload"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.3 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.98 }}
+                className="relative group cursor-pointer"
               >
-                {[
-                  { label: 'Images', value: stats.images, icon: '🖼️', color: 'from-blue-500 to-cyan-500' },
-                  { label: 'Videos', value: stats.videos, icon: '🎥', color: 'from-purple-500 to-pink-500' },
-                  { label: 'PDFs', value: stats.pdfs, icon: '📄', color: 'from-orange-500 to-red-500' },
-                  { label: 'Storage', value: formatFileSize(stats.totalSize), icon: '💾', color: 'from-green-500 to-emerald-500' },
-                ].map((stat, index) => (
-                  <motion.div
-                    key={stat.label}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.5 + index * 0.1 }}
-                    whileHover={{ scale: 1.05, y: -3 }}
-                    className="glass-card p-4 md:p-6 rounded-2xl group hover:shadow-glow transition-all"
-                  >
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className="text-2xl">{stat.icon}</span>
-                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{stat.label}</p>
-                    </div>
-                    <p className={`text-2xl md:text-3xl font-black bg-gradient-to-r ${stat.color} bg-clip-text text-transparent`}>
-                      {stat.value}
-                    </p>
-                  </motion.div>
-                ))}
-              </motion.div>
+                <div className="relative flex items-center gap-3 px-8 py-4 bg-indigo-600 text-white rounded-xl font-semibold transition-all">
+                  <Upload className="w-5 h-5" />
+                  <span>Upload Document</span>
+                </div>
+                <input
+                  id="file-upload"
+                  type="file"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  accept="*/*"
+                />
+              </motion.label>
             </div>
+
+            {/* Stats Grid */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8"
+            >
+              {[
+                { label: 'Images', value: stats.images, icon: '🖼️' },
+                { label: 'Videos', value: stats.videos, icon: '🎥' },
+                { label: 'PDFs', value: stats.pdfs, icon: '📄' },
+                { label: 'Storage', value: formatFileSize(stats.totalSize), icon: '💾' },
+              ].map((stat, index) => (
+                <motion.div
+                  key={stat.label}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.5 + index * 0.1 }}
+                  className="bg-gray-200 dark:bg-gray-700 p-4 md:p-6 rounded-xl"
+                >
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="text-2xl">{stat.icon}</span>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{stat.label}</p>
+                  </div>
+                  <p className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
+                    {stat.value}
+                  </p>
+                </motion.div>
+              ))}
+            </motion.div>
           </div>
         </motion.div>
 
@@ -357,8 +347,8 @@ export function Documents() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="glass-card p-6 rounded-2xl"
+          transition={{ delay: 0.2 }}
+          className="p-6 rounded-2xl bg-gray-100 dark:bg-gray-800"
         >
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
@@ -368,14 +358,14 @@ export function Documents() {
                 placeholder="Search documents..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-12 pr-4 py-3 w-full bg-white/50 dark:bg-dark-card/50 border border-gray-200 dark:border-dark-border rounded-xl text-gray-900 dark:text-white placeholder-gray-500 focus:ring-2 focus:ring-neon-blue focus:border-transparent transition-all font-medium backdrop-blur-sm"
+                className="pl-12 pr-4 py-3 w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all font-medium"
               />
             </div>
 
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className="px-4 py-3 bg-white/50 dark:bg-dark-card/50 border border-gray-200 dark:border-dark-border rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-neon-blue focus:border-transparent font-medium min-w-[150px] backdrop-blur-sm"
+              className="px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-medium min-w-[150px]"
             >
               <option value="all">All Types</option>
               <option value="image">Images</option>
@@ -391,13 +381,10 @@ export function Documents() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.7 }}
-            className="text-center py-24 cinematic-card rounded-3xl"
+            transition={{ delay: 0.3 }}
+            className="text-center py-24 bg-gray-100 dark:bg-gray-800 rounded-2xl"
           >
-            <div className="relative inline-block">
-              <Upload className="w-20 h-20 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
-              <div className="absolute inset-0 bg-neon-blue/20 rounded-full blur-2xl animate-pulse-glow"></div>
-            </div>
+            <Upload className="w-20 h-20 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
             <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">No documents found</h3>
             <p className="text-gray-600 dark:text-gray-400 text-lg">Upload your first document to get started</p>
           </motion.div>
@@ -406,80 +393,79 @@ export function Documents() {
             {filteredDocuments.map((document, index) => (
               <motion.div
                 key={document.id}
-                initial={{ opacity: 0, y: 30 }}
+                initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.7 + index * 0.05, type: "spring", stiffness: 100 }}
-                whileHover={{ scale: 1.03, y: -8 }}
-                className="group relative"
+                transition={{ delay: 0.3 + index * 0.05 }}
+                className="bg-gray-100 dark:bg-gray-800 p-6 rounded-2xl h-full flex flex-col"
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-neon-blue/0 to-neon-magenta/0 group-hover:from-neon-blue/10 group-hover:to-neon-magenta/10 rounded-3xl blur-xl transition-all duration-500"></div>
-
-                <div className="relative cinematic-card p-6 rounded-3xl h-full flex flex-col hover:shadow-glow-lg transition-all duration-300">
-                  <div className="flex items-start gap-4 mb-4">
-                    <div className="p-3 bg-gradient-to-br from-white/10 to-white/5 dark:from-white/5 dark:to-white/0 rounded-2xl backdrop-blur-sm border border-white/10 group-hover:scale-110 transition-transform">
-                      {getFileIcon(document.file_type)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-bold text-gray-900 dark:text-white truncate group-hover:text-neon-blue transition-colors">
-                        {document.title}
-                      </h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
-                        {document.file_name}
-                      </p>
-                    </div>
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="p-3 bg-gray-200 dark:bg-gray-700 rounded-xl">
+                    {getFileIcon(document.file_type)}
                   </div>
-
-                  {document.description && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-2 flex-grow">
-                      {document.description}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white truncate">
+                      {document.title}
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                      {document.file_name}
                     </p>
-                  )}
-
-                  <div className="space-y-3 mb-4 pt-4 border-t border-gray-200/50 dark:border-dark-border/50">
-                    <div className="flex items-center justify-between text-xs font-medium">
-                      <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-green-400"></span>
-                        {formatFileSize(document.file_size)}
-                      </span>
-                      <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                        <Download className="w-3 h-3" />
-                        {document.download_count}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                      <img
-                        src={document.uploader?.avatar || `https://ui-avatars.com/api/?name=${document.uploader?.name}&background=random`}
-                        alt={document.uploader?.name}
-                        className="w-6 h-6 rounded-full ring-2 ring-white/50 dark:ring-dark-border"
-                      />
-                      <span className="font-medium text-gray-700 dark:text-gray-300">{document.uploader?.name}</span>
-                      <span className="text-gray-400">•</span>
-                      <span>{format(new Date(document.created_at), 'MMM dd')}</span>
-                    </div>
                   </div>
+                </div>
 
-                  <div className="flex gap-2">
-                    <motion.button
-                      onClick={() => handleDownload(document)}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-neon-blue to-neon-cyan text-white hover:shadow-glow rounded-xl transition-all font-semibold text-sm"
-                    >
-                      <Download className="w-4 h-4" />
-                      <span>Download</span>
-                    </motion.button>
+                {document.description && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-2 flex-grow">
+                    {document.description}
+                  </p>
+                )}
 
-                    {(document.uploaded_by === user?.id) && (
-                      <motion.button
+                <div className="space-y-3 mb-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center justify-between text-xs font-medium">
+                    <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-green-400"></span>
+                      {formatFileSize(document.file_size)}
+                    </span>
+                    <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                      <Download className="w-3 h-3" />
+                      {document.download_count}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                    <img
+                      src={document.uploader?.avatar || `https://ui-avatars.com/api/?name=${document.uploader?.name}&background=random`}
+                      alt={document.uploader?.name}
+                      className="w-6 h-6 rounded-full"
+                    />
+                    <span className="font-medium text-gray-700 dark:text-gray-300">{document.uploader?.name}</span>
+                    <span className="text-gray-400">•</span>
+                    <span>{format(new Date(document.created_at), 'MMM dd')}</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleDownload(document)}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl transition-all font-semibold text-sm"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download</span>
+                  </button>
+
+                  {(document.uploaded_by === user?.id) && (
+                    <>
+                      <button
+                        onClick={() => setEditingDocument(document)}
+                        className="p-2.5 bg-blue-600 text-white rounded-xl transition-all shadow-sm"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
                         onClick={() => handleDelete(document)}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="p-2.5 bg-gradient-to-r from-red-500/90 to-pink-500/90 hover:from-red-500 hover:to-pink-500 text-white rounded-xl transition-all shadow-sm hover:shadow-glow-pink"
+                        className="p-2.5 bg-red-600 text-white rounded-xl transition-all shadow-sm"
                       >
                         <Trash2 className="w-4 h-4" />
-                      </motion.button>
-                    )}
-                  </div>
+                      </button>
+                    </>
+                  )}
                 </div>
               </motion.div>
             ))}
@@ -507,10 +493,10 @@ export function Documents() {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
               onClick={(e) => e.stopPropagation()}
-              className="cinematic-card max-w-lg w-full p-8 rounded-3xl shadow-2xl"
+              className="bg-white dark:bg-gray-800 max-w-lg w-full p-8 rounded-2xl shadow-2xl"
             >
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-3xl font-black text-gray-900 dark:text-white">Upload Document</h2>
+                <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Upload Document</h2>
                 <button
                   onClick={() => {
                     if (!uploading) {
@@ -521,17 +507,16 @@ export function Documents() {
                     }
                   }}
                   disabled={uploading}
-                  className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-dark-hover transition-colors disabled:opacity-50"
+                  className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
                 >
                   <X className="w-6 h-6 text-gray-500 dark:text-gray-400" />
                 </button>
               </div>
 
               <div className="space-y-5">
-                <div className="relative p-5 glass-card rounded-2xl border-2 border-neon-blue/30 overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-neon-blue/5 to-neon-magenta/5"></div>
+                <div className="relative p-5 bg-gray-100 dark:bg-gray-700 rounded-xl">
                   <div className="relative flex items-center gap-4">
-                    <div className="p-3 bg-white/10 dark:bg-black/20 rounded-xl">
+                    <div className="p-3 bg-gray-200 dark:bg-gray-600 rounded-xl">
                       {getFileIcon(selectedFile.type)}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -553,7 +538,7 @@ export function Documents() {
                     type="text"
                     value={uploadTitle}
                     onChange={(e) => setUploadTitle(e.target.value)}
-                    className="w-full px-4 py-3 bg-white/50 dark:bg-dark-card/50 border border-gray-200 dark:border-dark-border rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-neon-blue focus:border-transparent transition-all font-medium backdrop-blur-sm"
+                    className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all font-medium"
                     placeholder="Enter document title..."
                     disabled={uploading}
                   />
@@ -567,7 +552,7 @@ export function Documents() {
                     value={uploadDescription}
                     onChange={(e) => setUploadDescription(e.target.value)}
                     rows={3}
-                    className="w-full px-4 py-3 bg-white/50 dark:bg-dark-card/50 border border-gray-200 dark:border-dark-border rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-neon-blue focus:border-transparent transition-all font-medium resize-none backdrop-blur-sm"
+                    className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all font-medium resize-none"
                     placeholder="Add a description..."
                     disabled={uploading}
                   />
@@ -577,14 +562,14 @@ export function Documents() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm font-medium">
                       <span className="text-gray-600 dark:text-gray-400">Uploading...</span>
-                      <span className="text-neon-blue">{uploadProgress}%</span>
+                      <span className="text-indigo-600 dark:text-indigo-400">{uploadProgress}%</span>
                     </div>
-                    <div className="w-full h-2 bg-gray-200 dark:bg-dark-border rounded-full overflow-hidden">
+                    <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                       <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${uploadProgress}%` }}
                         transition={{ duration: 0.3 }}
-                        className="h-full bg-gradient-to-r from-neon-blue via-neon-cyan to-neon-magenta rounded-full"
+                        className="h-full bg-indigo-600 rounded-full"
                       />
                     </div>
                   </div>
@@ -599,14 +584,14 @@ export function Documents() {
                       setUploadDescription('');
                     }}
                     disabled={uploading}
-                    className="flex-1 px-5 py-3 border-2 border-gray-300 dark:border-dark-border text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-dark-hover transition-all font-semibold disabled:opacity-50"
+                    className="flex-1 px-5 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all font-semibold disabled:opacity-50"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleUpload}
                     disabled={uploading || !uploadTitle.trim()}
-                    className="flex-1 px-5 py-3 bg-gradient-to-r from-neon-blue to-neon-cyan text-white rounded-xl hover:shadow-glow disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold flex items-center justify-center gap-2"
+                    className="flex-1 px-5 py-3 bg-indigo-600 text-white rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold flex items-center justify-center gap-2"
                   >
                     <Upload className="w-5 h-5" />
                     <span>{uploading ? 'Uploading...' : 'Upload'}</span>
@@ -616,6 +601,14 @@ export function Documents() {
             </motion.div>
           </motion.div>
         )}
+
+        {/* Document Edit Modal */}
+        <DocumentEditModal
+          isOpen={editingDocument !== null}
+          onClose={() => setEditingDocument(null)}
+          document={editingDocument}
+          onSuccess={fetchDocuments}
+        />
       </div>
     </div>
   );

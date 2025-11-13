@@ -1,4 +1,3 @@
-import React from 'react';
 import { FolderOpen, CheckSquare, Users, TrendingUp, RefreshCw } from 'lucide-react';
 import { RealTimeActivity } from '../components/Dashboard/RealTimeActivity';
 import { UpcomingDeadlines } from '../components/Dashboard/UpcomingDeadlines';
@@ -52,7 +51,7 @@ export function Dashboard() {
           </button>
         </motion.div>
 
-        {/* Stats Grid - Clean & Minimal */}
+r        {/* Stats Grid - Clean & Minimal */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
