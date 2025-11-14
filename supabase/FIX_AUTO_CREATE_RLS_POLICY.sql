@@ -5,13 +5,21 @@
 -- profile creation for team members without profiles
 -- ================================================
 
--- Drop existing restrictive policy if it exists
+-- ================================================
+-- STEP 1: Drop ALL existing policies on users table
+-- ================================================
 DROP POLICY IF EXISTS "Users can only update own profile" ON users;
 DROP POLICY IF EXISTS "Users can only insert own profile" ON users;
 DROP POLICY IF EXISTS "Users can insert their own profile" ON users;
+DROP POLICY IF EXISTS "Allow authenticated users to insert profiles" ON users;
+DROP POLICY IF EXISTS "Allow users to read all profiles" ON users;
+DROP POLICY IF EXISTS "Allow users to update own profile" ON users;
+DROP POLICY IF EXISTS "Users can view all profiles" ON users;
+DROP POLICY IF EXISTS "Users can update own profile" ON users;
+DROP POLICY IF EXISTS "Users can insert own profile" ON users;
 
 -- ================================================
--- STEP 1: Allow users to INSERT their own profile
+-- STEP 2: Create INSERT policy (allow profile creation)
 -- ================================================
 CREATE POLICY "Allow authenticated users to insert profiles"
 ON users
@@ -20,10 +28,8 @@ TO authenticated
 WITH CHECK (true);  -- Allow any authenticated user to insert
 
 -- ================================================
--- STEP 2: Allow users to SELECT all profiles
--- (Needed to view team members)
+-- STEP 3: Create SELECT policy (view team members)
 -- ================================================
-DROP POLICY IF EXISTS "Allow users to read all profiles" ON users;
 CREATE POLICY "Allow users to read all profiles"
 ON users
 FOR SELECT
@@ -31,9 +37,8 @@ TO authenticated
 USING (true);  -- Allow reading all user profiles
 
 -- ================================================
--- STEP 3: Allow users to UPDATE their own profile
+-- STEP 4: Create UPDATE policy (only own profile)
 -- ================================================
-DROP POLICY IF EXISTS "Allow users to update own profile" ON users;
 CREATE POLICY "Allow users to update own profile"
 ON users
 FOR UPDATE

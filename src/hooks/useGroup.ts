@@ -93,8 +93,8 @@ export function useGroup(authReady: boolean = true) {
   }, [authReady]);
 
   const checkUserGroup = async () => {
-    setLoading(true);
     try {
+      setLoading(true);
       const userResp = await supabase.auth.getUser();
       const user = userResp?.data?.user ?? null;
 
@@ -148,23 +148,24 @@ export function useGroup(authReady: boolean = true) {
           setCurrentGroup(grp as Group);
           await fetchGroupMembers(grp.id);
           setLoading(false); // Set loading false after fetching members
+          return;
         } else {
-          console.log('Group not found');
+          console.log('Group not found even though membership exists');
           setCurrentGroup(null);
           setGroupMembers([]);
           setLoading(false);
         }
       } else {
-        console.log('User is not member of any group');
+        console.log('User is not a member of any group');
         setCurrentGroup(null);
         setGroupMembers([]);
         setLoading(false);
       }
     } catch (error) {
-      console.error('Error checking user group:', error);
+      console.error('Error in checkUserGroup:', error);
       setCurrentGroup(null);
       setGroupMembers([]);
-      setLoading(false); // Always set loading to false even on error
+      setLoading(false);
     }
   };
 
@@ -309,20 +310,22 @@ export function useGroup(authReady: boolean = true) {
 
       console.log('Joining group with code:', groupCode);
 
-      // Find group by code
+      // Find group by code - case insensitive
+      const normalizedCode = groupCode.toUpperCase().trim();
       const { data: group, error: groupError } = await supabase
         .from('groups')
         .select('*')
-        .eq('join_code', groupCode)
-        .single();
+        .ilike('join_code', normalizedCode)
+        .maybeSingle();
 
       if (groupError) {
         console.error('Group lookup error:', groupError);
-        throw new Error('Invalid group code');
+        throw new Error('Failed to lookup group. Please try again.');
       }
 
       if (!group) {
-        throw new Error('Group not found');
+        console.error('No group found with code:', normalizedCode);
+        throw new Error('Invalid group code. Please check and try again.');
       }
 
       console.log('Found group:', group.name);
