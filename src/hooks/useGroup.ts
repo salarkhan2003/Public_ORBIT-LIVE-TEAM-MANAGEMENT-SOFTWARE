@@ -1,22 +1,23 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { Group, GroupMember } from '../types';
 
 export function useGroup(authReady: boolean = true) {
   const [currentGroup, setCurrentGroup] = useState<Group | null>(null);
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Start with false, not true
   const initializedRef = useRef(false);
   const lastUserIdRef = useRef<string | null>(null);
 
-  // Load workspace from localStorage on mount
+  // Load workspace from localStorage on mount - DO THIS FIRST
   useEffect(() => {
     const savedWorkspace = localStorage.getItem('currentWorkspace');
     if (savedWorkspace) {
       try {
         const workspace = JSON.parse(savedWorkspace);
-        console.log('Restored workspace from localStorage:', workspace.name);
+        console.log('✅ Restored workspace from localStorage:', workspace.name);
         setCurrentGroup(workspace);
+        // Don't set loading here - let the auth check handle it
       } catch (error) {
         console.error('Failed to restore workspace:', error);
         localStorage.removeItem('currentWorkspace');
@@ -34,10 +35,198 @@ export function useGroup(authReady: boolean = true) {
     }
   }, [currentGroup]);
 
+  const fetchGroupMembers = useCallback(async (groupId: string) => {
+    try {
+      console.log('🔄 Fetching members for group:', groupId);
+
+      // Simple query - get member IDs first (MUST include id, joined_at for proper React keys)
+      const { data: memberData, error: memberError } = await supabase
+        .from('group_members')
+        .select('id, user_id, role, group_id, joined_at')
+        .eq('group_id', groupId);
+
+      if (memberError) {
+        console.error('❌ Error fetching group members:', memberError);
+        setGroupMembers([]);
+        return;
+      }
+
+      if (!memberData || memberData.length === 0) {
+        console.log('ℹ️ No members found for group');
+        setGroupMembers([]);
+        return;
+      }
+
+      console.log('📊 Found', memberData.length, 'member records');
+
+      // Then fetch user details separately
+      const userIds = memberData.map(m => m.user_id);
+
+      const { data: userDataResult, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .in('id', userIds);
+
+      if (userError) {
+        console.error('⚠️ Error fetching user data:', userError);
+        // Still set members even if user fetch fails
+        const membersWithoutUsers = memberData.map(member => ({
+          ...member,
+          users: {
+            id: member.user_id,
+            email: `user-${member.user_id.slice(0, 8)}@temp.local`,
+            name: `User ${member.user_id.slice(0, 8)}`,
+            role: 'developer',
+            created_at: new Date().toISOString()
+          }
+        }));
+        setGroupMembers(membersWithoutUsers as GroupMember[]);
+        return;
+      }
+
+      const userData = userDataResult || [];
+      console.log('✅ Fetched', userData.length, 'user profiles');
+
+      // Combine the data - ALWAYS create member objects
+      const members = memberData.map(member => {
+        const userProfile = userData.find(u => u.id === member.user_id);
+
+        return {
+          ...member,
+          users: userProfile || {
+            id: member.user_id,
+            email: `user-${member.user_id.slice(0, 8)}@temp.local`,
+            name: `User ${member.user_id.slice(0, 8)}`,
+            role: 'developer',
+            created_at: new Date().toISOString()
+          }
+        };
+      });
+
+      console.log('✅ Setting', members.length, 'members with profiles');
+      setGroupMembers(members as GroupMember[]);
+    } catch (error) {
+      console.error('❌ Error in fetchGroupMembers:', error);
+      setGroupMembers([]);
+    }
+  }, []);
+
+  const checkUserGroup = useCallback(async () => {
+    try {
+      setLoading(true);
+      const userResp = await supabase.auth.getUser();
+      const user = userResp?.data?.user ?? null;
+
+      console.log('🔍 Checking user group for:', user?.id);
+
+      if (!user) {
+        console.log('❌ No user found, stopping group check');
+        setCurrentGroup(null);
+        setGroupMembers([]);
+        setLoading(false);
+        return;
+      }
+
+      // Check if we have a cached workspace in localStorage
+      const savedWorkspace = localStorage.getItem('currentWorkspace');
+      if (savedWorkspace) {
+        try {
+          const workspace = JSON.parse(savedWorkspace);
+          console.log('📦 Found cached workspace:', workspace.name);
+
+          // Verify user is still member of this workspace
+          const { data: membership } = await supabase
+            .from('group_members')
+            .select('group_id, role, user_id')
+            .eq('user_id', user.id)
+            .eq('group_id', workspace.id)
+            .maybeSingle();
+
+          if (membership) {
+            console.log('✅ Cached workspace verified, user is still member');
+            setCurrentGroup(workspace);
+            await fetchGroupMembers(workspace.id);
+            setLoading(false);
+            return;
+          } else {
+            console.log('⚠️ User no longer member of cached workspace, clearing cache');
+            localStorage.removeItem('currentWorkspace');
+          }
+        } catch (err) {
+          console.error('Error validating cached workspace:', err);
+          localStorage.removeItem('currentWorkspace');
+        }
+      }
+
+      // Check if user is member of any group - SIMPLE QUERY (no recursion)
+      const { data: membership, error } = await supabase
+        .from('group_members')
+        .select('group_id, role, user_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error('❌ Error fetching group membership:', error);
+        setCurrentGroup(null);
+        setGroupMembers([]);
+        setLoading(false);
+        return;
+      }
+
+      console.log('📊 Group membership data:', membership);
+
+      if (membership && membership.group_id) {
+        // Fetch the group details separately
+        const { data: grp, error: groupError } = await supabase
+          .from('groups')
+          .select('*')
+          .eq('id', membership.group_id)
+          .single();
+
+        if (groupError) {
+          console.error('❌ Error fetching group:', groupError);
+          setCurrentGroup(null);
+          setGroupMembers([]);
+          setLoading(false);
+          return;
+        }
+
+        if (grp) {
+          console.log('✅ User is member of group:', grp.name);
+          setCurrentGroup(grp as Group);
+          await fetchGroupMembers(grp.id);
+          setLoading(false);
+          return;
+        } else {
+          console.log('⚠️ Group not found even though membership exists');
+          setCurrentGroup(null);
+          setGroupMembers([]);
+          setLoading(false);
+        }
+      } else {
+        console.log('ℹ️ User is not a member of any group');
+        setCurrentGroup(null);
+        setGroupMembers([]);
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('❌ Error in checkUserGroup:', error);
+      setCurrentGroup(null);
+      setGroupMembers([]);
+      setLoading(false);
+    } finally {
+      // SAFETY: Always ensure loading is false
+      console.log('🏁 checkUserGroup complete, ensuring loading is false');
+      setLoading(false);
+    }
+  }, [fetchGroupMembers]);
+
   useEffect(() => {
     // Get current user to detect user changes
     const checkUser = async () => {
       if (!authReady) {
+        console.log('Auth not ready, waiting...');
         setLoading(true);
         return;
       }
@@ -63,12 +252,20 @@ export function useGroup(authReady: boolean = true) {
       // Prevent double initialization for the same user
       if (initializedRef.current && currentUserId === lastUserIdRef.current) {
         console.log('Group already initialized for current user, skipping');
+        // Make sure loading is false if already initialized
+        if (loading) {
+          setLoading(false);
+        }
         return;
       }
 
       if (currentUserId) {
+        console.log('Initializing workspace check for user:', currentUserId);
         initializedRef.current = true;
-        checkUserGroup();
+        await checkUserGroup();
+      } else {
+        // No user, set loading to false
+        setLoading(false);
       }
     };
 
@@ -90,216 +287,8 @@ export function useGroup(authReady: boolean = true) {
       console.log('Group cleanup - maintaining user state');
       subscription.unsubscribe();
     };
-  }, [authReady]);
+  }, [authReady, checkUserGroup]);
 
-  const checkUserGroup = async () => {
-    try {
-      setLoading(true);
-      const userResp = await supabase.auth.getUser();
-      const user = userResp?.data?.user ?? null;
-
-      console.log('Checking user group for:', user?.id);
-
-      if (!user) {
-        console.log('No user found, stopping group check');
-        setCurrentGroup(null);
-        setGroupMembers([]);
-        setLoading(false);
-        return;
-      }
-
-      // Check if user is member of any group - SIMPLE QUERY (no recursion)
-      const { data: membership, error } = await supabase
-        .from('group_members')
-        .select('group_id, role, user_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching group membership:', error);
-        // Don't throw - just log and continue
-        setCurrentGroup(null);
-        setGroupMembers([]);
-        setLoading(false);
-        return;
-      }
-
-      console.log('Group membership data:', membership);
-
-      if (membership && membership.group_id) {
-        // Fetch the group details separately
-        const { data: grp, error: groupError } = await supabase
-          .from('groups')
-          .select('*')
-          .eq('id', membership.group_id)
-          .single();
-
-        if (groupError) {
-          console.error('Error fetching group:', groupError);
-          setCurrentGroup(null);
-          setGroupMembers([]);
-          setLoading(false);
-          return;
-        }
-
-        if (grp) {
-          console.log('User is member of group:', grp.name);
-          setCurrentGroup(grp as Group);
-          await fetchGroupMembers(grp.id);
-          setLoading(false); // Set loading false after fetching members
-          return;
-        } else {
-          console.log('Group not found even though membership exists');
-          setCurrentGroup(null);
-          setGroupMembers([]);
-          setLoading(false);
-        }
-      } else {
-        console.log('User is not a member of any group');
-        setCurrentGroup(null);
-        setGroupMembers([]);
-        setLoading(false);
-      }
-    } catch (error) {
-      console.error('Error in checkUserGroup:', error);
-      setCurrentGroup(null);
-      setGroupMembers([]);
-      setLoading(false);
-    }
-  };
-
-  // Helper function to create missing user profiles
-  const createMissingProfiles = async (userIds: string[]) => {
-    const createdProfiles = [];
-
-    for (const userId of userIds) {
-      try {
-        console.log('📝 Creating profile for:', userId.slice(0, 8));
-
-        // Create a minimal profile - user can update it when they log in
-        const minimalProfile = {
-          id: userId,
-          email: `user-${userId.slice(0, 8)}@pending.local`,
-          name: `User ${userId.slice(0, 8)}`,
-          role: 'developer',
-          title: 'Team Member',
-          created_at: new Date().toISOString(),
-        };
-
-        const { data: created, error } = await supabase
-          .from('users')
-          .insert([minimalProfile])
-          .select()
-          .single();
-
-        if (!error && created) {
-          createdProfiles.push(created);
-          console.log('✅ Created profile for:', userId.slice(0, 8));
-        } else if (error?.code === '23505') {
-          // Profile already exists (race condition), fetch it
-          console.log('Profile already exists, fetching:', userId.slice(0, 8));
-          const { data: existing } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', userId)
-            .single();
-          if (existing) {
-            createdProfiles.push(existing);
-            console.log('✅ Fetched existing profile for:', existing.name);
-          }
-        } else {
-          console.warn('Failed to create profile for:', userId.slice(0, 8), error?.message);
-        }
-      } catch (err) {
-        console.warn('Error creating profile for:', userId.slice(0, 8), err);
-      }
-    }
-
-    return createdProfiles;
-  };
-
-  const fetchGroupMembers = async (groupId: string) => {
-    try {
-      // Simple query - get member IDs first (MUST include id, joined_at for proper React keys)
-      const { data: memberData, error: memberError } = await supabase
-        .from('group_members')
-        .select('id, user_id, role, group_id, joined_at')
-        .eq('group_id', groupId);
-
-      if (memberError) {
-        console.error('Error fetching group members:', memberError);
-        return;
-      }
-
-      if (!memberData || memberData.length === 0) {
-        setGroupMembers([]);
-        return;
-      }
-
-      // Then fetch user details separately
-      const userIds = memberData.map(m => m.user_id);
-      console.log('🔍 Fetching user data for IDs:', userIds);
-
-      const { data: userDataResult, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .in('id', userIds);
-
-      if (userError) {
-        console.error('Error fetching user data:', userError);
-        setGroupMembers([]);
-        return;
-      }
-
-      // Use let so we can update it if we create profiles
-      let userData = userDataResult;
-
-      console.log('📊 User data fetched:', userData?.length, 'users');
-      console.log('📊 Member data:', memberData.length, 'members');
-
-      // Log any missing users and try to create their profiles
-      const fetchedUserIds = new Set(userData?.map(u => u.id) || []);
-      const missingUserIds = userIds.filter(id => !fetchedUserIds.has(id));
-
-      if (missingUserIds.length > 0) {
-        console.warn('⚠️ Missing user profiles for:', missingUserIds);
-        console.log('🔧 Attempting to create missing profiles from auth data...');
-
-        // Try to create profiles for missing users
-        const createdProfiles = await createMissingProfiles(missingUserIds);
-
-        if (createdProfiles.length > 0) {
-          console.log('✅ Created', createdProfiles.length, 'missing profiles');
-          // Add newly created profiles to userData
-          userData = [...(userData || []), ...createdProfiles];
-        } else {
-          console.warn('⚠️ Could not create profiles - users need to log in once');
-        }
-      }
-
-      // Combine the data
-      const members = memberData.map(member => ({
-        ...member,
-        users: userData?.find(u => u.id === member.user_id)
-      }));
-
-      // Verify all members have unique IDs (React key fix)
-      const memberIds = members.map(m => m.id);
-      const uniqueIds = new Set(memberIds);
-      if (memberIds.length === uniqueIds.size) {
-        console.log('✅ REACT KEY FIX VERIFIED: All', members.length, 'members have unique IDs');
-      } else {
-        console.warn('⚠️ Duplicate member IDs detected!');
-      }
-      console.log('Member IDs:', members.map(m => ({ id: m.id, name: m.users?.name })));
-
-      setGroupMembers((members as GroupMember[]) || []);
-    } catch (error) {
-      console.error('Error fetching group members:', error);
-      setGroupMembers([]);
-    }
-  };
 
   const joinGroup = async (groupCode: string) => {
     setLoading(true);

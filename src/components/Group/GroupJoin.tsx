@@ -29,35 +29,75 @@ export function GroupJoin() {
 
   const handleJoinGroup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!joinCode.trim()) return;
+    if (!joinCode.trim()) {
+      toast.error('Please enter a join code');
+      return;
+    }
 
     setLoading(true);
+    console.log('🔄 Starting join group process...');
+
     try {
-      await joinGroup(joinCode.toUpperCase());
+      const result = await joinGroup(joinCode.toUpperCase().trim());
+      console.log('✅ Join successful:', result);
       toast.success('Successfully joined workspace!');
 
-      // Add a small delay to ensure state updates propagate
+      // Small delay to ensure state updates
       setTimeout(() => {
-        // Force a full page reload to ensure all hooks re-initialize with new group
+        console.log('🚀 Redirecting to dashboard...');
         window.location.href = '/dashboard';
       }, 500);
     } catch (error: any) {
-      toast.error(error.message || 'Failed to join group');
+      console.error('❌ Join error:', error);
+
+      // Better error messages
+      let errorMessage = 'Failed to join workspace';
+
+      if (error.message?.includes('Invalid group code')) {
+        errorMessage = 'Invalid join code. Please check and try again.';
+      } else if (error.message?.includes('already a member')) {
+        errorMessage = 'You are already a member of another workspace.';
+      } else if (error.message?.includes('infinite recursion')) {
+        errorMessage = 'Database error. Please run the FIX_INFINITE_RECURSION_GROUP_MEMBERS.sql script in Supabase.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      toast.error(errorMessage);
       setLoading(false);
     }
   };
 
   const handleCreateGroup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!groupName.trim()) return;
+    if (!groupName.trim()) {
+      toast.error('Please enter a workspace name');
+      return;
+    }
 
     setLoading(true);
+    console.log('🔄 Creating workspace...');
+
     try {
       const group = await createGroup(groupName, groupDescription);
+      console.log('✅ Workspace created:', group);
       setCreatedGroup(group);
+      toast.success('Workspace created successfully!');
     } catch (error: any) {
-      toast.error(error.message || 'Failed to create group');
-    } finally {
+      console.error('❌ Create error:', error);
+
+      // Better error messages
+      let errorMessage = 'Failed to create workspace';
+
+      if (error.message?.includes('already a member')) {
+        errorMessage = 'You are already a member of a workspace. Please leave your current workspace first.';
+      } else if (error.message?.includes('infinite recursion')) {
+        errorMessage = 'Database error. Please run the FIX_INFINITE_RECURSION_GROUP_MEMBERS.sql script in Supabase.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      toast.error(errorMessage);
       setLoading(false);
     }
   };

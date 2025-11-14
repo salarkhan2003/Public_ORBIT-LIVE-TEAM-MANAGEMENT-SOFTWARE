@@ -80,7 +80,12 @@ function App() {
 
   // Add console logging to debug
   React.useEffect(() => {
-    console.log('App state:', { user, currentGroup, authLoading, groupLoading });
+    console.log('App state:', {
+      user: user?.email,
+      currentGroup: currentGroup?.name,
+      authLoading,
+      groupLoading
+    });
   }, [user, currentGroup, authLoading, groupLoading]);
 
   // Check if user needs to complete profile (Google OAuth users might have minimal info)
@@ -98,7 +103,7 @@ function App() {
     }
   }, [user]);
 
-  // Show loading spinner while checking auth and group
+  // Show loading spinner while checking auth
   if (authLoading) {
     return <FullPageLoader message="Loading ORBIT LIVE..." />;
   }
@@ -131,8 +136,9 @@ function App() {
     );
   }
 
-  // Show loading while checking group membership
+  // User is logged in - show loading while checking workspace (but with timeout protection)
   if (groupLoading) {
+    console.log('Group loading, showing workspace setup message...');
     return <FullPageLoader message="Setting up your workspace..." />;
   }
 
