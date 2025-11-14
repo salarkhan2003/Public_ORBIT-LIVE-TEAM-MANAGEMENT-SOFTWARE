@@ -6,7 +6,6 @@ import { User } from '../types';
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
   const initializedRef = useRef(false);
 
   useEffect(() => {
@@ -33,7 +32,6 @@ export function useAuth() {
           console.log('Component unmounted, aborting init');
           return;
         }
-        setSupabaseUser(currentUser);
 
         if (currentUser) {
           try {
@@ -50,7 +48,7 @@ export function useAuth() {
                 role: 'developer',
                 title: 'Team Member',
                 created_at: new Date().toISOString()
-              } as any);
+              } as User);
             }
           }
         } else {
@@ -88,7 +86,6 @@ export function useAuth() {
 
       try {
         const currentUser = session?.user ?? null;
-        setSupabaseUser(currentUser);
         if (currentUser) {
           try {
             await fetchOrCreateUserProfile(currentUser);
@@ -102,7 +99,7 @@ export function useAuth() {
               role: 'developer',
               title: 'Team Member',
               created_at: new Date().toISOString()
-            } as any);
+            } as User);
           }
         } else {
           setUser(null);
@@ -121,13 +118,14 @@ export function useAuth() {
       try {
         // v2 shape: listener?.subscription?.unsubscribe()
         // v1 shape: listener?.unsubscribe()
-        if ((listener as any)?.subscription?.unsubscribe) {
-          (listener as any).subscription.unsubscribe();
-        } else if ((listener as any)?.unsubscribe) {
-          (listener as any).unsubscribe();
+        const listenerObj = listener as { subscription?: { unsubscribe: () => void }; unsubscribe?: () => void };
+        if (listenerObj?.subscription?.unsubscribe) {
+          listenerObj.subscription.unsubscribe();
+        } else if (listenerObj?.unsubscribe) {
+          listenerObj.unsubscribe();
         }
-      } catch (e) {
-        // ignore
+      } catch {
+        // ignore cleanup errors
       }
     };
   }, []);
@@ -136,46 +134,30 @@ export function useAuth() {
     try {
       console.log('Fetching profile for user:', supabaseUserObj.id);
 
-      // Add timeout to prevent hanging - increased to 30 seconds
-      const fetchWithTimeout = async (promise: Promise<any>, timeoutMs: number = 30000) => {
-        const timeout = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Request timeout')), timeoutMs)
-        );
-        return Promise.race([promise, timeout]);
-      };
-
-      // First, try to fetch existing profile with timeout
-      const fetchPromise = supabase
+      // Fetch existing profile - Let Supabase handle timeout internally
+      const { data: existingProfile, error: fetchError } = await supabase
         .from('users')
         .select('*')
         .eq('id', supabaseUserObj.id)
         .maybeSingle();
 
-      const { data: existingProfile, error: fetchError } = await fetchWithTimeout(fetchPromise as any) as any;
-
-      // If timeout or other error (except no rows), handle gracefully
-      if (fetchError) {
-        if (fetchError.message === 'Request timeout') {
-          console.warn('Profile fetch timed out - continuing with basic user data');
-          // Create basic user object from auth data
-          const basicUser: User = {
-            id: supabaseUserObj.id,
-            email: supabaseUserObj.email || '',
-            name: supabaseUserObj.email?.split('@')[0] || 'User',
-            avatar: undefined,
-            role: 'developer',
-            title: 'Team Member',
-            created_at: new Date().toISOString(),
-          };
-          setUser(basicUser);
-          return;
-        }
-
-        if (!fetchError.message.includes('no rows')) {
-          console.error('Error fetching user profile:', fetchError);
-          throw fetchError;
-        }
+      // If error (except no rows), handle gracefully
+      if (fetchError && !fetchError.message.includes('no rows')) {
+        console.error('Error fetching user profile:', fetchError);
+        // Don't throw - create basic user object instead
+        const basicUser: User = {
+          id: supabaseUserObj.id,
+          email: supabaseUserObj.email || '',
+          name: supabaseUserObj.email?.split('@')[0] || 'User',
+          avatar: undefined,
+          role: 'developer',
+          title: 'Team Member',
+          created_at: new Date().toISOString(),
+        };
+        setUser(basicUser);
+        return;
       }
+
 
       if (existingProfile) {
         console.log('Profile found:', existingProfile);
@@ -186,17 +168,18 @@ export function useAuth() {
       console.log('No profile found, creating new one...');
 
       // Profile doesn't exist, create it
+      const metadata = supabaseUserObj.user_metadata as Record<string, unknown>;
       const profile: Partial<User> = {
         id: supabaseUserObj.id,
         email: supabaseUserObj.email || '',
         name:
-          (supabaseUserObj.user_metadata as any)?.full_name ||
-          (supabaseUserObj.user_metadata as any)?.name ||
+          (metadata?.full_name as string) ||
+          (metadata?.name as string) ||
           supabaseUserObj.email?.split('@')[0] ||
           'User',
-        avatar: (supabaseUserObj.user_metadata as any)?.avatar_url ||
-                (supabaseUserObj.user_metadata as any)?.picture ||
-                null,
+        avatar: (metadata?.avatar_url as string) ||
+                (metadata?.picture as string) ||
+                undefined,
         role: 'developer',
         title: 'Team Member',
         created_at: new Date().toISOString(),
@@ -251,9 +234,20 @@ export function useAuth() {
         console.log('User profile created successfully:', inserted);
         setUser(inserted as User);
       }
-    } catch (error: any) {
-      console.error('Error in fetchOrCreateUserProfile:', error);
-      throw error;
+    } catch (error: unknown) {
+      console.warn('Error in fetchOrCreateUserProfile (non-blocking):', error);
+      // Create fallback user object so app can continue
+      const fallbackUser: User = {
+        id: supabaseUserObj.id,
+        email: supabaseUserObj.email || '',
+        name: supabaseUserObj.email?.split('@')[0] || 'User',
+        avatar: undefined,
+        role: 'developer',
+        title: 'Team Member',
+        created_at: new Date().toISOString(),
+      };
+      setUser(fallbackUser);
+      // Don't throw - let the app continue
     }
   };
 
@@ -265,7 +259,6 @@ export function useAuth() {
       if (error) throw error;
       if (data?.user) {
         console.log('Sign in successful, user:', data.user.id);
-        setSupabaseUser(data.user);
         try {
           await fetchOrCreateUserProfile(data.user);
         } catch (profileError) {
@@ -274,7 +267,7 @@ export function useAuth() {
         }
       }
       return data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Sign in error:', error);
       throw error;
     } finally {
@@ -306,19 +299,18 @@ export function useAuth() {
 
       if (data?.user) {
         console.log('User created in auth.users, now creating profile...');
-        setSupabaseUser(data.user);
 
         try {
           await fetchOrCreateUserProfile(data.user);
           console.log('Profile created successfully!');
-        } catch (profileError: any) {
+        } catch (profileError: unknown) {
           console.error('Profile creation failed:', profileError);
           // Don't throw - user is authenticated, profile can be created later
           console.warn('User authenticated but profile creation failed. This can be fixed later.');
         }
       }
       return data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Sign up error:', error);
       throw error;
     } finally {
@@ -353,7 +345,6 @@ export function useAuth() {
     try {
       // Immediately clear user state for instant UI feedback
       setUser(null);
-      setSupabaseUser(null);
 
       // Then perform actual sign out in background
       const { error } = await supabase.auth.signOut();

@@ -7,6 +7,7 @@ export function useGroup(authReady: boolean = true) {
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
   const [loading, setLoading] = useState(true);
   const initializedRef = useRef(false);
+  const lastUserIdRef = useRef<string | null>(null);
 
   // Load workspace from localStorage on mount
   useEffect(() => {
@@ -34,20 +35,44 @@ export function useGroup(authReady: boolean = true) {
   }, [currentGroup]);
 
   useEffect(() => {
-    // Prevent double initialization in React 18 Strict Mode
-    if (initializedRef.current) {
-      console.log('Group already initialized, skipping');
-      return;
-    }
+    // Get current user to detect user changes
+    const checkUser = async () => {
+      if (!authReady) {
+        setLoading(true);
+        return;
+      }
 
-    // Wait for auth to be ready before checking group
-    if (!authReady) {
-      setLoading(true);
-      return;
-    }
+      const userResp = await supabase.auth.getUser();
+      const currentUserId = userResp?.data?.user?.id || null;
 
-    initializedRef.current = true;
-    checkUserGroup();
+      // If user changed (logged out/logged in as different user), reset initialization
+      if (currentUserId !== lastUserIdRef.current) {
+        console.log('User changed from', lastUserIdRef.current, 'to', currentUserId, '- resetting workspace check');
+        initializedRef.current = false;
+        lastUserIdRef.current = currentUserId;
+
+        // If user logged out, clear workspace
+        if (!currentUserId) {
+          setCurrentGroup(null);
+          setGroupMembers([]);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Prevent double initialization for the same user
+      if (initializedRef.current && currentUserId === lastUserIdRef.current) {
+        console.log('Group already initialized for current user, skipping');
+        return;
+      }
+
+      if (currentUserId) {
+        initializedRef.current = true;
+        checkUserGroup();
+      }
+    };
+
+    checkUser();
 
     // Real-time subscription for group changes
     const subscription = supabase
@@ -62,9 +87,8 @@ export function useGroup(authReady: boolean = true) {
       .subscribe();
 
     return () => {
-      console.log('Group cleanup - keeping initialized flag for persistence');
+      console.log('Group cleanup - maintaining user state');
       subscription.unsubscribe();
-      // Don't reset initializedRef to maintain workspace state across re-logins
     };
   }, [authReady]);
 
@@ -79,6 +103,7 @@ export function useGroup(authReady: boolean = true) {
       if (!user) {
         console.log('No user found, stopping group check');
         setCurrentGroup(null);
+        setGroupMembers([]);
         setLoading(false);
         return;
       }
@@ -95,6 +120,7 @@ export function useGroup(authReady: boolean = true) {
         console.error('Error fetching group membership:', error);
         // Don't throw - just log and continue
         setCurrentGroup(null);
+        setGroupMembers([]);
         setLoading(false);
         return;
       }
@@ -112,6 +138,7 @@ export function useGroup(authReady: boolean = true) {
         if (groupError) {
           console.error('Error fetching group:', groupError);
           setCurrentGroup(null);
+          setGroupMembers([]);
           setLoading(false);
           return;
         }
@@ -120,31 +147,83 @@ export function useGroup(authReady: boolean = true) {
           console.log('User is member of group:', grp.name);
           setCurrentGroup(grp as Group);
           await fetchGroupMembers(grp.id);
+          setLoading(false); // Set loading false after fetching members
         } else {
           console.log('Group not found');
           setCurrentGroup(null);
           setGroupMembers([]);
+          setLoading(false);
         }
       } else {
         console.log('User is not member of any group');
         setCurrentGroup(null);
         setGroupMembers([]);
+        setLoading(false);
       }
     } catch (error) {
       console.error('Error checking user group:', error);
       setCurrentGroup(null);
       setGroupMembers([]);
-    } finally {
-      setLoading(false);
+      setLoading(false); // Always set loading to false even on error
     }
+  };
+
+  // Helper function to create missing user profiles
+  const createMissingProfiles = async (userIds: string[]) => {
+    const createdProfiles = [];
+
+    for (const userId of userIds) {
+      try {
+        console.log('📝 Creating profile for:', userId.slice(0, 8));
+
+        // Create a minimal profile - user can update it when they log in
+        const minimalProfile = {
+          id: userId,
+          email: `user-${userId.slice(0, 8)}@pending.local`,
+          name: `User ${userId.slice(0, 8)}`,
+          role: 'developer',
+          title: 'Team Member',
+          created_at: new Date().toISOString(),
+        };
+
+        const { data: created, error } = await supabase
+          .from('users')
+          .insert([minimalProfile])
+          .select()
+          .single();
+
+        if (!error && created) {
+          createdProfiles.push(created);
+          console.log('✅ Created profile for:', userId.slice(0, 8));
+        } else if (error?.code === '23505') {
+          // Profile already exists (race condition), fetch it
+          console.log('Profile already exists, fetching:', userId.slice(0, 8));
+          const { data: existing } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', userId)
+            .single();
+          if (existing) {
+            createdProfiles.push(existing);
+            console.log('✅ Fetched existing profile for:', existing.name);
+          }
+        } else {
+          console.warn('Failed to create profile for:', userId.slice(0, 8), error?.message);
+        }
+      } catch (err) {
+        console.warn('Error creating profile for:', userId.slice(0, 8), err);
+      }
+    }
+
+    return createdProfiles;
   };
 
   const fetchGroupMembers = async (groupId: string) => {
     try {
-      // Simple query - get member IDs first
+      // Simple query - get member IDs first (MUST include id, joined_at for proper React keys)
       const { data: memberData, error: memberError } = await supabase
         .from('group_members')
-        .select('user_id, role, group_id')
+        .select('id, user_id, role, group_id, joined_at')
         .eq('group_id', groupId);
 
       if (memberError) {
@@ -159,7 +238,9 @@ export function useGroup(authReady: boolean = true) {
 
       // Then fetch user details separately
       const userIds = memberData.map(m => m.user_id);
-      const { data: userData, error: userError } = await supabase
+      console.log('🔍 Fetching user data for IDs:', userIds);
+
+      const { data: userDataResult, error: userError } = await supabase
         .from('users')
         .select('*')
         .in('id', userIds);
@@ -170,11 +251,47 @@ export function useGroup(authReady: boolean = true) {
         return;
       }
 
+      // Use let so we can update it if we create profiles
+      let userData = userDataResult;
+
+      console.log('📊 User data fetched:', userData?.length, 'users');
+      console.log('📊 Member data:', memberData.length, 'members');
+
+      // Log any missing users and try to create their profiles
+      const fetchedUserIds = new Set(userData?.map(u => u.id) || []);
+      const missingUserIds = userIds.filter(id => !fetchedUserIds.has(id));
+
+      if (missingUserIds.length > 0) {
+        console.warn('⚠️ Missing user profiles for:', missingUserIds);
+        console.log('🔧 Attempting to create missing profiles from auth data...');
+
+        // Try to create profiles for missing users
+        const createdProfiles = await createMissingProfiles(missingUserIds);
+
+        if (createdProfiles.length > 0) {
+          console.log('✅ Created', createdProfiles.length, 'missing profiles');
+          // Add newly created profiles to userData
+          userData = [...(userData || []), ...createdProfiles];
+        } else {
+          console.warn('⚠️ Could not create profiles - users need to log in once');
+        }
+      }
+
       // Combine the data
       const members = memberData.map(member => ({
         ...member,
         users: userData?.find(u => u.id === member.user_id)
       }));
+
+      // Verify all members have unique IDs (React key fix)
+      const memberIds = members.map(m => m.id);
+      const uniqueIds = new Set(memberIds);
+      if (memberIds.length === uniqueIds.size) {
+        console.log('✅ REACT KEY FIX VERIFIED: All', members.length, 'members have unique IDs');
+      } else {
+        console.warn('⚠️ Duplicate member IDs detected!');
+      }
+      console.log('Member IDs:', members.map(m => ({ id: m.id, name: m.users?.name })));
 
       setGroupMembers((members as GroupMember[]) || []);
     } catch (error) {

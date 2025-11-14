@@ -266,21 +266,21 @@ export function Documents() {
   return (
     <div className="min-h-screen bg-light-base dark:bg-dark-base transition-colors duration-300">
 
-      <div className="relative z-10 space-y-8 p-6 md:p-8 max-w-7xl mx-auto">
+      <div className="relative z-10 space-y-4 sm:space-y-6 md:space-y-8 p-3 sm:p-4 md:p-6 lg:p-8 max-w-7xl mx-auto">
         {/* Hero Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative p-8 md:p-12 rounded-2xl bg-gray-100 dark:bg-gray-800"
+          className="relative p-4 sm:p-6 md:p-8 lg:p-12 rounded-xl sm:rounded-2xl bg-gray-100 dark:bg-gray-800"
         >
           <div className="relative z-10">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-              <div className="space-y-3">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 sm:gap-6">
+              <div className="space-y-2 sm:space-y-3">
                 <motion.h1
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.1 }}
-                  className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white tracking-tight"
+                  className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 dark:text-white tracking-tight"
                 >
                   Documents
                 </motion.h1>
@@ -288,7 +288,7 @@ export function Documents() {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.2 }}
-                  className="text-lg text-gray-600 dark:text-gray-300 flex items-center gap-3"
+                  className="text-sm sm:text-base md:text-lg text-gray-600 dark:text-gray-300 flex items-center gap-2 sm:gap-3 flex-wrap"
                 >
                   <span className="font-semibold text-indigo-600 dark:text-indigo-400">{stats.total} files</span>
                   <span className="text-gray-400">•</span>
@@ -303,10 +303,10 @@ export function Documents() {
                 transition={{ delay: 0.3 }}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.98 }}
-                className="relative group cursor-pointer"
+                className="relative group cursor-pointer w-full md:w-auto"
               >
-                <div className="relative flex items-center gap-3 px-8 py-4 bg-indigo-600 text-white rounded-xl font-semibold transition-all">
-                  <Upload className="w-5 h-5" />
+                <div className="relative flex items-center justify-center gap-2 sm:gap-3 px-4 sm:px-6 md:px-8 py-3 sm:py-4 bg-indigo-600 text-white rounded-xl font-semibold transition-all text-sm sm:text-base">
+                  <Upload className="w-4 h-4 sm:w-5 sm:h-5" />
                   <span>Upload Document</span>
                 </div>
                 <input
@@ -324,7 +324,7 @@ export function Documents() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
-              className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8"
+              className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mt-4 sm:mt-6 md:mt-8"
             >
               {[
                 { label: 'Images', value: stats.images, icon: '🖼️' },

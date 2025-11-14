@@ -232,23 +232,23 @@ export function AIAssistant() {
 
   return (
     <div className="h-screen flex bg-gradient-to-br from-light-base to-light-elevated dark:from-dark-base dark:to-dark-elevated overflow-hidden">
-      {/* Sidebar - ElevenLabs Style */}
+      {/* Sidebar - Hidden on mobile, visible on md+ */}
       <motion.div
         initial={{ x: -300 }}
         animate={{ x: 0 }}
-        className="w-80 glass-card border-r border-gray-200 dark:border-dark-border flex flex-col"
+        className="hidden md:flex md:w-64 lg:w-80 glass-card border-r border-gray-200 dark:border-dark-border flex-col"
       >
         {/* Header */}
-        <div className="p-6 border-b border-gray-200 dark:border-dark-border">
+        <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-dark-border">
           <motion.button
             onClick={createNewConversation}
             whileHover={{ scale: 1.02, y: -2 }}
             whileTap={{ scale: 0.98 }}
             className="w-full relative group"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-neon-blue to-neon-cyan rounded-2xl blur-lg opacity-50 group-hover:opacity-75 transition-opacity"></div>
-            <div className="relative flex items-center justify-center gap-2 px-4 py-4 bg-gradient-to-r from-neon-blue to-neon-cyan text-white rounded-2xl font-semibold shadow-glow">
-              <Plus className="w-5 h-5" />
+            <div className="absolute inset-0 bg-gradient-to-r from-neon-blue to-neon-cyan rounded-xl sm:rounded-2xl blur-lg opacity-50 group-hover:opacity-75 transition-opacity"></div>
+            <div className="relative flex items-center justify-center gap-2 px-3 sm:px-4 py-3 sm:py-4 bg-gradient-to-r from-neon-blue to-neon-cyan text-white rounded-xl sm:rounded-2xl font-semibold shadow-glow text-sm sm:text-base">
+              <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
               <span>New Conversation</span>
             </div>
           </motion.button>
@@ -300,51 +300,51 @@ export function AIAssistant() {
       </motion.div>
 
       {/* Main Chat Area - Luma Cinematic */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
         {activeConversation ? (
           <>
             {/* Chat Header */}
             <motion.div
               initial={{ y: -50, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              className="glass-card border-b border-gray-200 dark:border-dark-border p-6"
+              className="glass-card border-b border-gray-200 dark:border-dark-border p-3 sm:p-4 md:p-6"
             >
-              <div className="flex items-center gap-4">
-                <div className="relative">
-                  <div className="w-12 h-12 bg-gradient-to-br from-neon-blue to-neon-cyan rounded-2xl flex items-center justify-center shadow-glow">
-                    <Bot className="w-7 h-7 text-white" />
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="relative flex-shrink-0">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-neon-blue to-neon-cyan rounded-xl sm:rounded-2xl flex items-center justify-center shadow-glow">
+                    <Bot className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 text-white" />
                   </div>
-                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white dark:border-dark-card"></div>
+                  <div className="absolute -bottom-0.5 -right-0.5 sm:-bottom-1 sm:-right-1 w-3 h-3 sm:w-4 sm:h-4 bg-green-400 rounded-full border-2 border-white dark:border-dark-card"></div>
                 </div>
-                <div>
-                  <h2 className="text-xl font-black text-gray-900 dark:text-white">ORBIT AI</h2>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Your intelligent assistant</p>
+                <div className="min-w-0">
+                  <h2 className="text-lg sm:text-xl font-black text-gray-900 dark:text-white truncate">ORBIT AI</h2>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Your intelligent assistant</p>
                 </div>
               </div>
             </motion.div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 custom-scrollbar">
               {activeConversation.messages.length === 0 ? (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="flex flex-col items-center justify-center h-full"
+                  className="flex flex-col items-center justify-center h-full px-4"
                 >
-                  <div className="relative mb-8">
+                  <div className="relative mb-6 sm:mb-8">
                     <motion.div
                       animate={{ rotate: 360 }}
                       transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                      className="w-24 h-24 bg-gradient-to-br from-neon-blue to-neon-cyan rounded-3xl flex items-center justify-center shadow-glow"
+                      className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 bg-gradient-to-br from-neon-blue to-neon-cyan rounded-2xl sm:rounded-3xl flex items-center justify-center shadow-glow"
                     >
-                      <Sparkles className="w-12 h-12 text-white" />
+                      <Sparkles className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 text-white" />
                     </motion.div>
                   </div>
                   
-                  <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-2">
+                  <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white mb-2 text-center">
                     How can I help you today?
                   </h3>
-                  <p className="text-gray-600 dark:text-gray-400 text-center mb-8 max-w-md">
+                  <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 text-center mb-6 sm:mb-8 max-w-md px-4">
                     Ask me anything about your tasks, projects, team, or let me help you automate workflows
                   </p>
 

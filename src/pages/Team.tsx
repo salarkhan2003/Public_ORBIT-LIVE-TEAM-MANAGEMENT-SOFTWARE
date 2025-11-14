@@ -244,28 +244,28 @@ export function Team() {
           {/* Join Code Section */}
           <motion.div
             whileHover={{ scale: 1.02 }}
-            className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6"
+            className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-xl sm:rounded-2xl p-4 sm:p-6"
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-white/70 text-sm font-medium mb-2">Workspace Join Code</p>
-                <div className="flex items-center space-x-3">
-                  <code className="text-3xl font-black text-white tracking-wider px-4 py-2 bg-white/20 rounded-xl">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <p className="text-white/70 text-xs sm:text-sm font-medium mb-2">Workspace Join Code</p>
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <code className="text-xl sm:text-2xl md:text-3xl font-black text-white tracking-wider px-3 sm:px-4 py-1.5 sm:py-2 bg-white/20 rounded-lg sm:rounded-xl break-all">
                     {currentGroup?.join_code}
                   </code>
                   <motion.button
                     onClick={copyJoinCode}
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
-                    className="p-3 bg-white/20 hover:bg-white/30 rounded-xl transition-all"
+                    className="p-2 sm:p-3 bg-white/20 hover:bg-white/30 rounded-lg sm:rounded-xl transition-all flex-shrink-0"
                   >
-                    {copiedCode ? <Check className="w-6 h-6 text-green-300" /> : <Copy className="w-6 h-6 text-white" />}
+                    {copiedCode ? <Check className="w-5 h-5 sm:w-6 sm:h-6 text-green-300" /> : <Copy className="w-5 h-5 sm:w-6 sm:h-6 text-white" />}
                   </motion.button>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="text-white/70 text-sm mb-1">Share this code • Anyone can join & rejoin unlimited times</p>
-                <p className="text-white text-sm">Created {currentGroup?.created_at && format(new Date(currentGroup.created_at), 'MMM dd, yyyy')}</p>
+              <div className="lg:text-right">
+                <p className="text-white/70 text-xs sm:text-sm mb-1">Share this code • Anyone can join & rejoin unlimited times</p>
+                <p className="text-white text-xs sm:text-sm">Created {currentGroup?.created_at && format(new Date(currentGroup.created_at), 'MMM dd, yyyy')}</p>
               </div>
             </div>
           </motion.div>
@@ -275,23 +275,22 @@ export function Team() {
         <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
       </motion.div>
 
-      {/* Team Members Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {groupMembers.map((member, index) => (
+      {/* Team Members Grid - Fixed: Keys are unique, no animation delays */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        {groupMembers.map((member) => (
           <motion.div
             key={member.id}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
             whileHover={{ scale: 1.03, y: -5 }}
-            className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 hover:shadow-2xl transition-all"
+            className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-xl sm:rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-6 hover:shadow-2xl transition-all"
           >
             <div className="flex items-center space-x-4 mb-4">
               <div className="relative">
                 <motion.img
                   whileHover={{ scale: 1.1, rotate: 5 }}
-                  src={member.users?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.users?.name || 'User')}&background=3B82F6&color=fff`}
-                  alt={member.users?.name}
+                  src={member.users?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.users?.name || member.users?.email || 'Unknown User')}&background=3B82F6&color=fff`}
+                  alt={member.users?.name || member.users?.email || 'Unknown User'}
                   className="w-16 h-16 rounded-full border-4 border-white dark:border-gray-700 shadow-lg object-cover"
                 />
                 {member.role === 'admin' && (
@@ -303,10 +302,15 @@ export function Team() {
               </div>
               <div className="flex-1">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                  {member.users?.name}
+                  {member.users?.name || member.users?.email || `User ${member.user_id.slice(0, 8)}...`}
                   {member.user_id === user?.id && <span className="text-sm text-blue-600 dark:text-blue-400"> (You)</span>}
                   {member.user_id === currentGroup?.group_owner_id && <span className="text-sm text-purple-600 dark:text-purple-400"> 👑 Owner</span>}
                 </h3>
+                {!member.users && (
+                  <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
+                    ⚠️ Profile not found - User ID: {member.user_id.slice(0, 8)}...
+                  </p>
+                )}
                 <div className="flex items-center space-x-2 flex-wrap gap-1 mt-1">
                   <span className={`px-3 py-1 text-xs rounded-full font-bold ${
                     member.role === 'admin' 
@@ -333,7 +337,6 @@ export function Team() {
                       key={`${member.id}-role-${idx}-${role}`}
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: idx * 0.05 }}
                       className="inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm"
                     >
                       <Tag className="w-3 h-3 mr-1" />
@@ -354,7 +357,9 @@ export function Team() {
 
               <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
                 <Mail className="w-4 h-4" />
-                <span className="truncate">{member.users?.email}</span>
+                <span className="truncate">
+                  {member.users?.email || `No email (User ID: ${member.user_id.slice(0, 8)}...)`}
+                </span>
               </div>
 
               <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
@@ -366,6 +371,13 @@ export function Team() {
                   }
                 </span>
               </div>
+
+              {/* Warning if user profile is missing */}
+              {!member.users && (
+                <div className="flex items-center space-x-2 text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded-lg">
+                  <span>⚠️ User profile not created yet. Ask them to log in once to create their profile.</span>
+                </div>
+              )}
             </div>
 
             {/* Action Buttons */}
@@ -900,7 +912,6 @@ function RoleManagementModal({ member, onClose, onUpdate }: RoleManagementModalP
                   key={`selected-role-${member.id}-${idx}-${role}`}
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: idx * 0.03 }}
                   className="inline-flex items-center px-3 py-1.5 text-sm font-semibold rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md"
                 >
                   <Tag className="w-3 h-3 mr-1.5" />
@@ -937,12 +948,11 @@ function RoleManagementModal({ member, onClose, onUpdate }: RoleManagementModalP
         <div className="mb-6">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Predefined Roles</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-64 overflow-y-auto">
-            {PREDEFINED_ROLES.map((role, idx) => (
+            {PREDEFINED_ROLES.map((role) => (
               <motion.button
-                key={`predefined-role-${role}-${idx}`}
+                key={`predefined-role-${role}`}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.02 }}
                 onClick={() => handleRoleToggle(role)}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
