@@ -136,8 +136,8 @@ export function useAuth() {
     try {
       console.log('Fetching profile for user:', supabaseUserObj.id);
 
-      // Add timeout to prevent hanging
-      const fetchWithTimeout = async (promise: Promise<any>, timeoutMs: number = 10000) => {
+      // Add timeout to prevent hanging - increased to 30 seconds
+      const fetchWithTimeout = async (promise: Promise<any>, timeoutMs: number = 30000) => {
         const timeout = new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Request timeout')), timeoutMs)
         );
@@ -151,16 +151,30 @@ export function useAuth() {
         .eq('id', supabaseUserObj.id)
         .maybeSingle();
 
-      const { data: existingProfile, error: fetchError } = await fetchWithTimeout(fetchPromise, 8000) as any;
+      const { data: existingProfile, error: fetchError } = await fetchWithTimeout(fetchPromise as any) as any;
 
-      if (fetchError && !fetchError.message.includes('no rows') && fetchError.message !== 'Request timeout') {
-        console.error('Error fetching user profile:', fetchError);
-        throw fetchError;
-      }
+      // If timeout or other error (except no rows), handle gracefully
+      if (fetchError) {
+        if (fetchError.message === 'Request timeout') {
+          console.warn('Profile fetch timed out - continuing with basic user data');
+          // Create basic user object from auth data
+          const basicUser: User = {
+            id: supabaseUserObj.id,
+            email: supabaseUserObj.email || '',
+            name: supabaseUserObj.email?.split('@')[0] || 'User',
+            avatar: undefined,
+            role: 'developer',
+            title: 'Team Member',
+            created_at: new Date().toISOString(),
+          };
+          setUser(basicUser);
+          return;
+        }
 
-      if (fetchError && fetchError.message === 'Request timeout') {
-        console.error('Profile fetch timed out');
-        throw new Error('Database request timed out. Please check your connection.');
+        if (!fetchError.message.includes('no rows')) {
+          console.error('Error fetching user profile:', fetchError);
+          throw fetchError;
+        }
       }
 
       if (existingProfile) {

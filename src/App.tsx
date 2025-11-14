@@ -9,6 +9,8 @@ import { AuthCallback } from './pages/AuthCallback';
 import { LandingPage } from './pages/LandingPage';
 import { TermsAndConditions } from './pages/TermsAndConditions';
 import { PrivacyPolicy } from './pages/PrivacyPolicy';
+import { Careers } from './pages/Careers';
+import { Contact } from './pages/Contact';
 import { FullPageLoader } from './components/Shared/LoadingAnimation';
 import { useAuth } from './hooks/useAuth';
 import { useGroup } from './hooks/useGroup';
@@ -109,6 +111,8 @@ function App() {
           {/* Public routes */}
           <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/careers" element={<Careers />} />
+          <Route path="/contact" element={<Contact />} />
           <Route
             path="*"
             element={

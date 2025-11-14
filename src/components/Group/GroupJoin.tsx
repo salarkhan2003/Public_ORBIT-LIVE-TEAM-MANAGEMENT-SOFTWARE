@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Users, Plus, ArrowRight, Copy, Check, Sparkles } from 'lucide-react';
+import { Users, Plus, ArrowRight, Copy, Check, Sparkles, LogOut } from 'lucide-react';
 import { useGroup } from '../../hooks/useGroup';
+import { useAuth } from '../../hooks/useAuth';
 import toast from 'react-hot-toast';
 
 export function GroupJoin() {
@@ -12,6 +13,19 @@ export function GroupJoin() {
   const [createdGroup, setCreatedGroup] = useState<any>(null);
   const [copied, setCopied] = useState(false);
   const { joinGroup, createGroup } = useGroup();
+  const { signOut } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      localStorage.removeItem('currentWorkspace');
+      toast.success('Logged out successfully');
+      window.location.href = '/';
+    } catch (error) {
+      toast.error('Failed to logout');
+      console.error('Logout error:', error);
+    }
+  };
 
   const handleJoinGroup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,6 +81,16 @@ export function GroupJoin() {
   if (createdGroup) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-6">
+        {/* Logout Button - Fixed Position */}
+        <button
+          onClick={handleLogout}
+          className="fixed top-4 right-4 sm:top-6 sm:right-6 flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors shadow-md z-50"
+          title="Logout"
+        >
+          <LogOut className="w-4 h-4" />
+          <span className="hidden sm:inline text-sm font-medium">Logout</span>
+        </button>
+
         <div className="max-w-lg w-full">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             {/* Success Header */}
@@ -157,6 +181,16 @@ export function GroupJoin() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-6">
+      {/* Logout Button - Fixed Position */}
+      <button
+        onClick={handleLogout}
+        className="fixed top-4 right-4 sm:top-6 sm:right-6 flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors shadow-md z-50"
+        title="Logout"
+      >
+        <LogOut className="w-4 h-4" />
+        <span className="hidden sm:inline text-sm font-medium">Logout</span>
+      </button>
+
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
           <div className="w-20 h-20 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">

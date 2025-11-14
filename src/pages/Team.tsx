@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Mail, Calendar, Edit, Plus, Crown, Shield, Copy, Check, Tag, X, RefreshCw, Settings, UserMinus, LogOut, UserCog } from 'lucide-react';
 import { useGroup } from '../hooks/useGroup';
 import { useAuth } from '../hooks/useAuth';
-import { LoadingAnimation } from '../components/Shared/LoadingAnimation';
 import { format } from 'date-fns';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -26,7 +25,7 @@ interface TeamMember {
 }
 
 export function Team() {
-  const { currentGroup, groupMembers, refreshGroup } = useGroup();
+  const { currentGroup, groupMembers, refreshGroup, loading } = useGroup();
   const { user } = useAuth();
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showRoleModal, setShowRoleModal] = useState(false);
@@ -41,6 +40,61 @@ export function Team() {
   const currentUserMember = groupMembers.find(m => m.user_id === user?.id);
   const isAdmin = currentUserMember?.role === 'admin';
   const isOwner = currentGroup?.group_owner_id === user?.id;
+
+  // Show beautiful loading animation while fetching data
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center"
+        >
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            className="w-20 h-20 mx-auto mb-6 border-4 border-blue-200 border-t-blue-600 rounded-full"
+          />
+          <motion.h2
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="text-2xl font-bold text-gray-900 dark:text-white mb-2"
+          >
+            Loading Team Members...
+          </motion.h2>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            className="text-gray-600 dark:text-gray-400"
+          >
+            Fetching your workspace data
+          </motion.p>
+          {/* Animated dots */}
+          <motion.div
+            className="flex justify-center space-x-2 mt-4"
+          >
+            {[0, 1, 2].map((i) => (
+              <motion.div
+                key={`loading-dot-${i}`}
+                animate={{
+                  scale: [1, 1.5, 1],
+                  opacity: [0.3, 1, 0.3],
+                }}
+                transition={{
+                  duration: 1.5,
+                  repeat: Infinity,
+                  delay: i * 0.2,
+                }}
+                className="w-3 h-3 bg-blue-600 rounded-full"
+              />
+            ))}
+          </motion.div>
+        </motion.div>
+      </div>
+    );
+  }
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -116,15 +170,9 @@ export function Team() {
     }
   };
 
-  // Show loading if no group data yet
-  if (!currentGroup) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <LoadingAnimation variant="wave" size="md" text="Loading Team..." />
-      </div>
-    );
-  }
+  // REMOVED ALL LOADING CHECKS - ALWAYS SHOW CONTENT IMMEDIATELY
 
+  // Always render the page - no more loading screens!
   return (
     <div className="space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6">
       {/* Hero Header */}
@@ -138,7 +186,9 @@ export function Team() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 md:gap-6 mb-4 sm:mb-6">
             <div className="min-w-0 flex-1">
               <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-1 sm:mb-2 truncate">Team Members 👥</h1>
-              <p className="text-white/90 text-sm sm:text-base md:text-lg truncate">{currentGroup?.name} • {groupMembers.length} members</p>
+              <p className="text-white/90 text-sm sm:text-base md:text-lg truncate">
+                {currentGroup?.name || 'Loading...'} • {groupMembers.length} member{groupMembers.length !== 1 ? 's' : ''}
+              </p>
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
@@ -279,13 +329,16 @@ export function Team() {
               <div className="mb-3">
                 <div className="flex flex-wrap gap-2">
                   {member.users.custom_roles.map((role: string, idx: number) => (
-                    <span
-                      key={idx}
+                    <motion.span
+                      key={`${member.id}-role-${idx}-${role}`}
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: idx * 0.05 }}
                       className="inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm"
                     >
                       <Tag className="w-3 h-3 mr-1" />
                       {role}
-                    </span>
+                    </motion.span>
                   ))}
                 </div>
               </div>
@@ -306,7 +359,12 @@ export function Team() {
 
               <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
                 <Calendar className="w-4 h-4" />
-                <span>Joined {format(new Date(member.joined_at || ''), 'MMM dd, yyyy')}</span>
+                <span>
+                  Joined {member.joined_at
+                    ? format(new Date(member.joined_at), 'MMM dd, yyyy')
+                    : 'Recently'
+                  }
+                </span>
               </div>
             </div>
 
@@ -838,13 +896,19 @@ function RoleManagementModal({ member, onClose, onUpdate }: RoleManagementModalP
             </h3>
             <div className="flex flex-wrap gap-2">
               {selectedRoles.map((role, idx) => (
-                <span key={idx} className="inline-flex items-center px-3 py-1.5 text-sm font-semibold rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md">
+                <motion.span
+                  key={`selected-role-${member.id}-${idx}-${role}`}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: idx * 0.03 }}
+                  className="inline-flex items-center px-3 py-1.5 text-sm font-semibold rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md"
+                >
                   <Tag className="w-3 h-3 mr-1.5" />
                   {role}
                   <button onClick={() => handleRemoveRole(role)} className="ml-2 p-0.5 rounded-full hover:bg-white/20">
                     <X className="w-3 h-3" />
                   </button>
-                </span>
+                </motion.span>
               ))}
             </div>
           </div>
@@ -873,10 +937,15 @@ function RoleManagementModal({ member, onClose, onUpdate }: RoleManagementModalP
         <div className="mb-6">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Predefined Roles</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-64 overflow-y-auto">
-            {PREDEFINED_ROLES.map(role => (
-              <button
-                key={role}
+            {PREDEFINED_ROLES.map((role, idx) => (
+              <motion.button
+                key={`predefined-role-${role}-${idx}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.02 }}
                 onClick={() => handleRoleToggle(role)}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 className={`px-3 py-2 text-sm rounded-lg font-semibold transition-all flex items-center justify-center space-x-2 ${
                   selectedRoles.includes(role) 
                     ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-md'
@@ -885,7 +954,7 @@ function RoleManagementModal({ member, onClose, onUpdate }: RoleManagementModalP
               >
                 <span>{role}</span>
                 {selectedRoles.includes(role) && <Check className="w-4 h-4" />}
-              </button>
+              </motion.button>
             ))}
           </div>
         </div>

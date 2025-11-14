@@ -69,6 +69,9 @@ export function useDashboard() {
       return () => {
         subscriptions.forEach(sub => sub.unsubscribe());
       };
+    } else if (!currentGroup && user) {
+      // User is logged in but no group - stop loading
+      setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentGroup, user]);
@@ -162,111 +165,87 @@ export function useDashboard() {
   };
 
   const fetchTasks = async () => {
-    const { data, error } = await supabase
-      .from('tasks')
-      .select(`
-        *,
-        assignee:assigned_to(id, name, avatar),
-        projects(name)
-      `)
-      .eq('group_id', currentGroup!.id);
-    
-    if (error) throw error;
-    return data || [];
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('group_id', currentGroup!.id);
+
+      if (error) {
+        console.error('Error fetching tasks:', error);
+        return [];
+      }
+      return data || [];
+    } catch (error) {
+      console.error('Error in fetchTasks:', error);
+      return [];
+    }
   };
 
   const fetchRecentActivity = async () => {
-    const { data, error } = await supabase
-      .from('activity_logs')
-      .select(`
-        *,
-        user:user_id(id, name, avatar)
-      `)
-      .eq('group_id', currentGroup!.id)
-      .order('created_at', { ascending: false })
-      .limit(10);
+    try {
+      const { data, error } = await supabase
+        .from('activity_logs')
+        .select('*')
+        .eq('group_id', currentGroup!.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
 
-    if (error) throw error;
-    
-    return (data || []).map(activity => ({
-      id: activity.id,
-      type: activity.action,
-      title: getActivityTitle(activity.action),
-      description: activity.description,
-      user: {
-        name: activity.user?.name || 'Unknown User',
-        avatar: activity.user?.avatar
-      },
-      time: formatTimeAgo(activity.created_at),
-      icon: getActivityIcon(activity.action),
-      color: getActivityColor(activity.action)
-    }));
+      if (error) {
+        console.error('Error fetching activity:', error);
+        return [];
+      }
+
+      return (data || []).map(activity => ({
+        id: activity.id,
+        type: activity.action,
+        title: getActivityTitle(activity.action),
+        description: activity.description,
+        user: {
+          name: 'User',
+          avatar: undefined
+        },
+        time: formatTimeAgo(activity.created_at),
+        icon: getActivityIcon(activity.action),
+        color: getActivityColor(activity.action)
+      }));
+    } catch (error) {
+      console.error('Error in fetchRecentActivity:', error);
+      return [];
+    }
   };
 
   const fetchUpcomingDeadlines = async () => {
-    const now = new Date();
-    const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    try {
+      const now = new Date();
+      const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-    // Fetch tasks with deadlines
-    const { data: tasksData, error: tasksError } = await supabase
-      .from('tasks')
-      .select(`
-        *,
-        assignee:assigned_to(id, name, avatar),
-        projects(name)
-      `)
-      .eq('group_id', currentGroup!.id)
-      .not('deadline', 'is', null)
-      .gte('deadline', now.toISOString())
-      .lte('deadline', nextWeek.toISOString())
-      .order('deadline', { ascending: true });
+      const { data: tasksData, error: tasksError } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('group_id', currentGroup!.id)
+        .not('deadline', 'is', null)
+        .gte('deadline', now.toISOString())
+        .lte('deadline', nextWeek.toISOString())
+        .order('deadline', { ascending: true });
 
-    if (tasksError) throw tasksError;
+      if (tasksError) {
+        console.error('Error fetching task deadlines:', tasksError);
+        return [];
+      }
 
-    // Fetch projects with deadlines
-    const { data: projectsData, error: projectsError } = await supabase
-      .from('projects')
-      .select('*')
-      .eq('group_id', currentGroup!.id)
-      .not('deadline', 'is', null)
-      .gte('deadline', now.toISOString())
-      .lte('deadline', nextWeek.toISOString())
-      .order('deadline', { ascending: true });
-
-    if (projectsError) throw projectsError;
-
-    const deadlines: UpcomingDeadline[] = [];
-
-    // Add task deadlines
-    (tasksData || []).forEach(task => {
-      deadlines.push({
+      return (tasksData || []).map(task => ({
         id: task.id,
         title: task.title,
         dueDate: task.deadline,
-        priority: task.priority,
-        type: 'task',
-        assignee: task.assignee ? {
-          name: task.assignee.name,
-          avatar: task.assignee.avatar
-        } : undefined
-      });
-    });
-
-    // Add project deadlines
-    (projectsData || []).forEach(project => {
-      deadlines.push({
-        id: project.id,
-        title: project.name,
-        dueDate: project.deadline,
-        priority: 'medium', // Projects don't have priority, default to medium
-        type: 'project'
-      });
-    });
-
-    // Sort by deadline
-    deadlines.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-
-    return deadlines.slice(0, 5); // Return top 5 upcoming deadlines
+        priority: task.priority || 'medium',
+        type: 'task' as const,
+        assignee: undefined
+      }));
+    } catch (error) {
+      console.error('Error in fetchUpcomingDeadlines:', error);
+      return [];
+    }
   };
 
   const setupRealtimeSubscriptions = () => {
