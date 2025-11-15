@@ -40,15 +40,23 @@ export function GroupJoin() {
     try {
       const result = await joinGroup(joinCode.toUpperCase().trim());
       console.log('✅ Join successful:', result);
+
+      // Immediately set loading to false
+      setLoading(false);
+
       toast.success('Successfully joined workspace!');
 
-      // Small delay to ensure state updates
+      // Force navigation after short delay
       setTimeout(() => {
-        console.log('🚀 Redirecting to dashboard...');
-        window.location.href = '/dashboard';
-      }, 500);
+        console.log('🚀 Forcing redirect to dashboard...');
+        // Use replace to prevent back button issues
+        window.location.replace('/dashboard');
+      }, 1000);
     } catch (error: any) {
       console.error('❌ Join error:', error);
+
+      // Ensure loading is stopped on error
+      setLoading(false);
 
       // Better error messages
       let errorMessage = 'Failed to join workspace';
@@ -64,7 +72,6 @@ export function GroupJoin() {
       }
 
       toast.error(errorMessage);
-      setLoading(false);
     }
   };
 

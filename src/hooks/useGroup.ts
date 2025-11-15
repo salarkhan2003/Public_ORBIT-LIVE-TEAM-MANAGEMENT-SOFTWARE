@@ -388,13 +388,20 @@ export function useGroup(authReady: boolean = true) {
       setCurrentGroup(group as Group);
       await fetchGroupMembers(group.id);
 
-
+      // CRITICAL: Set loading to false before returning
       setLoading(false);
+
+      // Save to localStorage
+      localStorage.setItem('currentWorkspace', JSON.stringify(group));
+
       return group;
     } catch (error) {
       console.error('Error joining group:', error);
       setLoading(false);
       throw error;
+    } finally {
+      // SAFETY: Always ensure loading is false
+      setLoading(false);
     }
   };
 
@@ -473,12 +480,18 @@ export function useGroup(authReady: boolean = true) {
       setCurrentGroup(group as Group);
       await fetchGroupMembers(group.id);
 
+      // Save to localStorage
+      localStorage.setItem('currentWorkspace', JSON.stringify(group));
+
       setLoading(false);
       return group;
     } catch (error) {
       console.error('Error creating group:', error);
       setLoading(false);
       throw error;
+    } finally {
+      // SAFETY: Always ensure loading is false
+      setLoading(false);
     }
   };
 
