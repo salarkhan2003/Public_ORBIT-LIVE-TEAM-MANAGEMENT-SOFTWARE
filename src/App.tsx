@@ -145,6 +145,9 @@ function App() {
     return <FullPageLoader message="Setting up your workspace..." />;
   }
 
+  // Check if user wants to skip workspace setup (stored in localStorage)
+  const hasSkippedWorkspace = localStorage.getItem('skipWorkspace') === 'true';
+
   // Wrap everything in Router since we need navigation everywhere
   return (
     <Router>
@@ -155,11 +158,11 @@ function App() {
         {/* Show profile setup if needed */}
         {showProfileSetup ? (
           <Route path="*" element={<ProfileSetup onComplete={() => setShowProfileSetup(false)} />} />
-        ) : !currentGroup ? (
-          /* User needs to join/create a workspace */
+        ) : !currentGroup && !hasSkippedWorkspace ? (
+          /* User needs to join/create a workspace OR can skip */
           <Route path="*" element={<GroupJoin />} />
         ) : (
-          /* User is authenticated and has a workspace - show main app */
+          /* User is authenticated (with or without workspace) - show main app */
           <>
             <Route path="/" element={<Layout><Dashboard /></Layout>} />
             <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />

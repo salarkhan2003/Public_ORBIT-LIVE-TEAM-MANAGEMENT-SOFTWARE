@@ -124,6 +124,15 @@ export function GroupJoin() {
     window.location.href = '/dashboard';
   };
 
+  const handleSkip = () => {
+    console.log('Skip clicked, allowing exploration without workspace...');
+    // Set skip flag in localStorage
+    localStorage.setItem('skipWorkspace', 'true');
+    toast.success('You can join or create a workspace later from Settings');
+    // Navigate to dashboard
+    window.location.href = '/dashboard';
+  };
+
   // Show success screen after workspace is created
   if (createdGroup) {
     return (
@@ -349,12 +358,27 @@ export function GroupJoin() {
                   ) : (
                     <>
                       <Plus className="w-4 h-4" />
-                      <span>Create ORBIT LIVE TEAM Workspace</span>
+                      <span>Create Workspace</span>
                     </>
                   )}
                 </button>
               </form>
             )}
+
+            {/* Skip Button */}
+            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+              <button
+                onClick={handleSkip}
+                disabled={loading}
+                className="w-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-3 px-4 rounded-lg font-medium hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center space-x-2"
+              >
+                <span>Skip for now - Explore as guest</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+              <p className="text-xs text-center text-gray-500 dark:text-gray-400 mt-3">
+                You can join or create a workspace anytime from Settings
+              </p>
+            </div>
           </div>
         </div>
 

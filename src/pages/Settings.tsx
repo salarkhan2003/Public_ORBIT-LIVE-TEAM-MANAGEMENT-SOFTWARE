@@ -638,7 +638,7 @@ export function Settings() {
                 </div>
 
                 <div className="space-y-6">
-                  {currentGroup && (
+                  {currentGroup ? (
                     <>
                       <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-xl p-6 border border-blue-200 dark:border-blue-700">
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
@@ -687,6 +687,77 @@ export function Settings() {
                         </div>
                       </div>
                     </>
+                  ) : (
+                    /* No workspace - Show join/create options */
+                    <div className="space-y-6">
+                      <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-6 border border-yellow-200 dark:border-yellow-800">
+                        <div className="flex items-start space-x-3">
+                          <div className="flex-shrink-0">
+                            <UsersIcon className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                              No Workspace Connected
+                            </h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                              You're currently exploring ORBIT LIVE TEAM as a guest. Join or create a workspace to collaborate with your team and unlock all features.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-6 md:grid-cols-2">
+                        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 transition-colors">
+                          <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center mb-4">
+                            <UsersIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                          </div>
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                            Join Workspace
+                          </h3>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                            Have a join code? Join an existing workspace and start collaborating with your team.
+                          </p>
+                          <button
+                            onClick={() => {
+                              localStorage.removeItem('skipWorkspace');
+                              window.location.href = '/';
+                            }}
+                            className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
+                          >
+                            <UsersIcon className="w-4 h-4" />
+                            <span>Join Workspace</span>
+                          </button>
+                        </div>
+
+                        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 hover:border-green-500 dark:hover:border-green-500 transition-colors">
+                          <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center mb-4">
+                            <UsersIcon className="w-6 h-6 text-green-600 dark:text-green-400" />
+                          </div>
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                            Create Workspace
+                          </h3>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                            Start fresh! Create a new workspace and invite your team members to join.
+                          </p>
+                          <button
+                            onClick={() => {
+                              localStorage.removeItem('skipWorkspace');
+                              window.location.href = '/';
+                            }}
+                            className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
+                          >
+                            <UsersIcon className="w-4 h-4" />
+                            <span>Create Workspace</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
+                        <p className="text-sm text-blue-800 dark:text-blue-200">
+                          <strong>💡 Note:</strong> You can continue exploring the app as a guest, but some features require a workspace.
+                        </p>
+                      </div>
+                    </div>
                   )}
                 </div>
               </motion.div>
