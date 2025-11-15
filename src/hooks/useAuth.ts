@@ -290,7 +290,9 @@ export function useAuth() {
           data: {
             full_name: name
           },
-          emailRedirectTo: emailRedirectTo, // Add redirect URL for email confirmation
+          emailRedirectTo: emailRedirectTo,
+          // Skip captcha verification for better UX
+          captchaToken: undefined,
         }
       });
 
@@ -298,6 +300,12 @@ export function useAuth() {
 
       if (error) {
         console.error('Supabase auth error:', error);
+
+        // Handle captcha error specifically
+        if (error.message.includes('captcha') || error.message.includes('CAPTCHA')) {
+          throw new Error('Security verification failed. Please disable CAPTCHA in Supabase Dashboard under Authentication > Settings > Security');
+        }
+
         // Provide more helpful error messages
         if (error.message.includes('already registered')) {
           throw new Error('This email is already registered. Please sign in instead.');

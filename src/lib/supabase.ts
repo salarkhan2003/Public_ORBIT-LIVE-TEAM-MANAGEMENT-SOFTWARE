@@ -18,5 +18,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     storage: window.localStorage,
     storageKey: 'orbit-live-auth',
-  }
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'orbit-live-team@1.0.0',
+    },
+  },
 });

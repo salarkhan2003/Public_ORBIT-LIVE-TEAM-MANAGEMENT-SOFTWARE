@@ -113,6 +113,9 @@ function App() {
     return (
       <Router>
         <Routes>
+          {/* Auth callback route - must be accessible even when not logged in */}
+          <Route path="/auth/callback" element={<AuthCallback />} />
+
           {/* Public routes */}
           <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
