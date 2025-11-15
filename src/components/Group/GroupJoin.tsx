@@ -35,23 +35,21 @@ export function GroupJoin() {
     }
 
     setLoading(true);
-    console.log('🔄 Starting join group process...');
+    console.log('🔄 Starting join group process with code:', joinCode);
 
     try {
       const result = await joinGroup(joinCode.toUpperCase().trim());
-      console.log('✅ Join successful:', result);
+      console.log('✅ Join successful, group returned:', result);
 
-      // Immediately set loading to false
-      setLoading(false);
-
+      // Show success message
       toast.success('Successfully joined workspace!');
 
-      // Force navigation after short delay
+      // Small delay to show success message, then redirect
+      console.log('🚀 Redirecting to dashboard...');
       setTimeout(() => {
-        console.log('🚀 Forcing redirect to dashboard...');
-        // Use replace to prevent back button issues
-        window.location.replace('/dashboard');
-      }, 1000);
+        window.location.href = '/dashboard';
+      }, 500);
+
     } catch (error: any) {
       console.error('❌ Join error:', error);
 

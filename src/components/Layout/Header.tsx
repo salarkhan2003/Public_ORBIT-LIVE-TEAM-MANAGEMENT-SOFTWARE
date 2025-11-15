@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Menu, Search, Bell, Moon, Sun, LogOut, User } from 'lucide-react';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../hooks/useAuth';
+import { useNotificationContext } from '../../context/NotificationContext';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 
@@ -12,6 +14,8 @@ interface HeaderProps {
 export function Header({ onMenuClick }: HeaderProps) {
   const { isDark, toggleTheme } = useTheme();
   const { user, signOut } = useAuth();
+  const { unreadCount } = useNotificationContext();
+  const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -104,17 +108,23 @@ export function Header({ onMenuClick }: HeaderProps) {
 
           {/* Notifications with badge */}
           <motion.button
+            onClick={() => navigate('/notifications')}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
-            className="p-2 rounded-xl hover:bg-white/20 relative transition-all backdrop-blur-sm touch-manipulation hidden sm:flex"
-            aria-label="Notifications"
+            className="p-2 rounded-xl hover:bg-white/20 relative transition-all backdrop-blur-sm touch-manipulation"
+            aria-label={`Notifications ${unreadCount > 0 ? `(${unreadCount} unread)` : ''}`}
+            title="Notifications"
           >
             <Bell className="w-5 h-5 text-white" />
-            <motion.span
-              animate={{ scale: [1, 1.2, 1] }}
-              transition={{ duration: 2, repeat: Infinity }}
-              className="absolute top-1.5 right-1.5 w-2 h-2 bg-yellow-400 rounded-full border border-white"
-            ></motion.span>
+            {unreadCount > 0 && (
+              <motion.span
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 shadow-lg border-2 border-white/30"
+              >
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </motion.span>
+            )}
           </motion.button>
 
           {/* User menu with enhanced styling */}

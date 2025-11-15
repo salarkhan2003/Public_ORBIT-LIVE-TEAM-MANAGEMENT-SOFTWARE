@@ -1,132 +1,24 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { Bell, Check, CheckCheck, Trash2, Search, AlertCircle, Info, AlertTriangle, CheckCircle, Sparkles } from 'lucide-react';
-import { supabase } from '../lib/supabase';
 import { Notification } from '../types';
-import { useAuth } from '../hooks/useAuth';
+import { useNotificationContext } from '../context/NotificationContext';
 import { LoadingAnimation } from '../components/Shared/LoadingAnimation';
-import toast from 'react-hot-toast';
 import { format, formatDistanceToNow } from 'date-fns';
 import { motion } from 'framer-motion';
 
 export function Notifications() {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    notifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification
+  } = useNotificationContext();
+
   const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const { user } = useAuth();
-
-  const fetchNotifications = useCallback(async () => {
-    if (!user) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setNotifications(data || []);
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
-      toast.error('Failed to load notifications');
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (user) {
-      fetchNotifications();
-      
-      // Set up real-time subscription
-      const subscription = supabase
-        .channel('notifications')
-        .on('postgres_changes', 
-          { 
-            event: '*', 
-            schema: 'public', 
-            table: 'notifications',
-            filter: `user_id=eq.${user.id}`
-          }, 
-          () => {
-            fetchNotifications();
-          }
-        )
-        .subscribe();
-
-      return () => {
-        subscription.unsubscribe();
-      };
-    }
-  }, [user, fetchNotifications]);
-
-  const markAsRead = async (notificationId: string) => {
-    try {
-      const { error } = await supabase
-        .from('notifications')
-        .update({ read: true })
-        .eq('id', notificationId);
-
-      if (error) throw error;
-
-      setNotifications(prev => 
-        prev.map(notif => 
-          notif.id === notificationId ? { ...notif, read: true } : notif
-        )
-      );
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-      toast.error('Failed to mark as read');
-    }
-  };
-
-  const markAllAsRead = async () => {
-    try {
-      const unreadIds = notifications
-        .filter(notif => !notif.read)
-        .map(notif => notif.id);
-
-      if (unreadIds.length === 0) return;
-
-      const { error } = await supabase
-        .from('notifications')
-        .update({ read: true })
-        .in('id', unreadIds);
-
-      if (error) throw error;
-
-      setNotifications(prev => 
-        prev.map(notif => ({ ...notif, read: true }))
-      );
-
-      toast.success('All notifications marked as read');
-    } catch (error) {
-      console.error('Error marking all as read:', error);
-      toast.error('Failed to mark all as read');
-    }
-  };
-
-  const deleteNotification = async (notificationId: string) => {
-    try {
-      const { error } = await supabase
-        .from('notifications')
-        .delete()
-        .eq('id', notificationId);
-
-      if (error) throw error;
-
-      setNotifications(prev => 
-        prev.filter(notif => notif.id !== notificationId)
-      );
-
-      toast.success('Notification deleted');
-    } catch (error) {
-      console.error('Error deleting notification:', error);
-      toast.error('Failed to delete notification');
-    }
-  };
+  const [loading] = useState(false);
 
   const getNotificationIcon = (type: Notification['type']) => {
     switch (type) {
@@ -167,7 +59,6 @@ export function Notifications() {
     return matchesFilter && matchesType && matchesSearch;
   });
 
-  const unreadCount = notifications.filter(notif => !notif.read).length;
 
   if (loading) {
     return (

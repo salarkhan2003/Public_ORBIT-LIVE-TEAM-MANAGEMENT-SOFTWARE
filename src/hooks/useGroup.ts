@@ -327,11 +327,11 @@ export function useGroup(authReady: boolean = true) {
         .maybeSingle();
 
       if (anyMembership) {
-        console.log('User already in a group');
+        console.log('⚠️ User already in a group:', anyMembership.group_id);
 
         // If same group, just return it
         if (anyMembership.group_id === group.id) {
-          // Fetch full group details
+          console.log('✅ Already member of this group, fetching details...');
           const { data: existingGroup } = await supabase
             .from('groups')
             .select('*')
@@ -340,7 +340,16 @@ export function useGroup(authReady: boolean = true) {
 
           if (existingGroup) {
             setCurrentGroup(existingGroup as Group);
-            await fetchGroupMembers(existingGroup.id);
+
+            // Fetch members without blocking - runs in background
+            fetchGroupMembers(existingGroup.id).catch(err =>
+              console.error('Warning: Failed to fetch members:', err)
+            );
+
+            // Save to localStorage
+            localStorage.setItem('currentWorkspace', JSON.stringify(existingGroup));
+
+            console.log('✅ Group set, returning immediately');
             setLoading(false);
             return existingGroup;
           }
@@ -370,38 +379,46 @@ export function useGroup(authReady: boolean = true) {
         .single();
 
       if (memberError) {
-        console.error('Error adding member:', memberError);
-        // If it's a duplicate key error, fetch the existing membership
+        console.error('❌ Error adding member:', memberError);
+        // If it's a duplicate key error, it's okay
         if (memberError.code === '23505') {
-          console.log('Duplicate detected, fetching group');
+          console.log('✅ Duplicate detected (expected), proceeding...');
           setCurrentGroup(group as Group);
-          await fetchGroupMembers(group.id);
+
+          // Fetch members without blocking
+          fetchGroupMembers(group.id).catch(err =>
+            console.error('Warning: Failed to fetch members:', err)
+          );
+
+          localStorage.setItem('currentWorkspace', JSON.stringify(group));
           setLoading(false);
           return group;
         }
         throw memberError;
       }
 
-      console.log('Successfully added to group');
+      console.log('✅ Successfully added to group');
 
       // Update the state
       setCurrentGroup(group as Group);
-      await fetchGroupMembers(group.id);
 
-      // CRITICAL: Set loading to false before returning
-      setLoading(false);
+      // Fetch members without blocking - runs in background
+      fetchGroupMembers(group.id).catch(err =>
+        console.error('Warning: Failed to fetch members:', err)
+      );
 
       // Save to localStorage
       localStorage.setItem('currentWorkspace', JSON.stringify(group));
 
+      // CRITICAL: Set loading to false before returning
+      console.log('✅ Join complete, setting loading to false');
+      setLoading(false);
+
       return group;
     } catch (error) {
-      console.error('Error joining group:', error);
+      console.error('❌ Error in joinGroup:', error);
       setLoading(false);
       throw error;
-    } finally {
-      // SAFETY: Always ensure loading is false
-      setLoading(false);
     }
   };
 
