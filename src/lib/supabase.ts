@@ -11,6 +11,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  // Keep default behaviour but ensure session persistence is enabled for browser usage
-  auth: { persistSession: true, detectSessionInUrl: true }
+  auth: {
+    persistSession: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce',
+    autoRefreshToken: true,
+    storage: window.localStorage,
+    storageKey: 'orbit-live-auth',
+  }
 });

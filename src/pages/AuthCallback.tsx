@@ -20,31 +20,33 @@ export function AuthCallback() {
 
         if (errorParam) {
           console.error('OAuth error:', errorParam, errorDescription);
-          toast.error(errorDescription || 'Authentication failed');
-          navigate('/', { replace: true });
+          const friendlyError = errorDescription || 'Authentication failed. Please try again.';
+          toast.error(friendlyError, { duration: 5000 });
+          setError(friendlyError);
+          setTimeout(() => navigate('/', { replace: true }), 3000);
           return;
         }
 
         // Get the session from Supabase
-        const { data, error } = await supabase.auth.getSession();
+        const { data, error: sessionError } = await supabase.auth.getSession();
 
-        if (error) {
-          console.error('Error getting session:', error);
+        if (sessionError) {
+          console.error('Error getting session:', sessionError);
           toast.error('Authentication failed. Please try again.');
-          navigate('/', { replace: true });
+          setTimeout(() => navigate('/', { replace: true }), 2000);
           return;
         }
 
         if (!data?.session?.user) {
           console.log('No session found, redirecting to login');
           toast.error('No session found. Please sign in again.');
-          navigate('/', { replace: true });
+          setTimeout(() => navigate('/', { replace: true }), 2000);
           return;
         }
 
         const user = data.session.user;
-        console.log('OAuth user authenticated:', user.id);
-        setStatus('Creating your profile...');
+        console.log('User authenticated:', user.id);
+        setStatus('Setting up your profile...');
 
         // Check if user profile exists
         const { data: existingProfile, error: fetchError } = await supabase
@@ -57,14 +59,14 @@ export function AuthCallback() {
           console.error('Error checking user profile:', fetchError);
           toast.error('Failed to verify profile. Please try again.');
           await supabase.auth.signOut();
-          navigate('/', { replace: true });
+          setTimeout(() => navigate('/', { replace: true }), 2000);
           return;
         }
 
         // If no profile exists, create one
         if (!existingProfile) {
-          console.log('Creating user profile for OAuth user...');
-          setStatus('Setting up your workspace...');
+          console.log('Creating user profile...');
+          setStatus('Creating your workspace...');
 
           const profile = {
             id: user.id,
@@ -90,36 +92,32 @@ export function AuthCallback() {
 
             // Check if it's a duplicate key error (profile already exists)
             if (insertError.message.includes('duplicate key') || insertError.code === '23505') {
-              console.log('Profile already exists (race condition), continuing...');
+              console.log('Profile already exists, continuing...');
             } else {
-              // Real error - sign user out and redirect
-              setError('Failed to create user profile. Please contact support.');
-              toast.error('Failed to complete sign up. Please try again.');
+              // Real error - provide helpful message
+              setError('Failed to create profile. Please ensure database is properly configured.');
+              toast.error('Profile creation failed. Check console for details.', { duration: 5000 });
               await supabase.auth.signOut();
-              navigate('/', { replace: true });
+              setTimeout(() => navigate('/', { replace: true }), 3000);
               return;
             }
-          } else {
-            console.log('User profile created successfully');
           }
-        } else {
-          console.log('User profile already exists');
         }
 
-        // Success! Redirect to dashboard
-        setStatus('Success! Redirecting...');
+        setStatus('Success! Redirecting to dashboard...');
         toast.success('Welcome to ORBIT LIVE TEAM!');
 
-        // Small delay to show success message
+        // Give user a moment to see success message
         setTimeout(() => {
-          navigate('/', { replace: true });
+          navigate('/dashboard', { replace: true });
         }, 1000);
 
-      } catch (error: any) {
-        console.error('Error in auth callback:', error);
-        setError(error.message || 'An unexpected error occurred');
-        toast.error('Authentication error. Please try again.');
-        navigate('/', { replace: true });
+      } catch (err) {
+        console.error('Unexpected error in auth callback:', err);
+        const errorMsg = err instanceof Error ? err.message : 'An unexpected error occurred';
+        setError(errorMsg);
+        toast.error(errorMsg);
+        setTimeout(() => navigate('/', { replace: true }), 3000);
       }
     };
 

@@ -280,13 +280,17 @@ export function useAuth() {
       setLoading(true);
       console.log('Starting signup process...', { email, name });
 
+      const origin = window.location.origin;
+      const emailRedirectTo = `${origin}/auth/callback`;
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: name
-          }
+          },
+          emailRedirectTo: emailRedirectTo, // Add redirect URL for email confirmation
         }
       });
 
@@ -294,12 +298,25 @@ export function useAuth() {
 
       if (error) {
         console.error('Supabase auth error:', error);
-        throw error;
+        // Provide more helpful error messages
+        if (error.message.includes('already registered')) {
+          throw new Error('This email is already registered. Please sign in instead.');
+        }
+        throw new Error(error.message || 'Failed to create account');
       }
 
       if (data?.user) {
-        console.log('User created in auth.users, now creating profile...');
+        console.log('User created in auth.users:', data.user.id);
+        console.log('Email confirmation required:', !data.session);
 
+        // If there's no session, it means email confirmation is required
+        if (!data.session) {
+          console.log('Email confirmation required. User will receive confirmation email.');
+          // Don't try to create profile yet - it will be created after email confirmation
+          return data;
+        }
+
+        // If there's a session, user is auto-confirmed (email confirmation disabled)
         try {
           await fetchOrCreateUserProfile(data.user);
           console.log('Profile created successfully!');
@@ -320,7 +337,11 @@ export function useAuth() {
 
   const signInWithGoogle = async () => {
     try {
-      const redirectTo = `${window.location.origin}/auth/callback`;
+      // Get the current origin or use production URL
+      const origin = window.location.origin;
+      const redirectTo = `${origin}/auth/callback`;
+
+      console.log('Google OAuth redirect URL:', redirectTo);
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -328,12 +349,17 @@ export function useAuth() {
           redirectTo: redirectTo,
           queryParams: {
             access_type: 'offline',
-            prompt: 'consent',
-          }
+            prompt: 'select_account', // Changed from 'consent' to allow account selection
+          },
+          skipBrowserRedirect: false, // Ensure browser redirect happens
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Google OAuth error:', error);
+        throw new Error(error.message || 'Failed to initiate Google sign-in');
+      }
+
       return data;
     } catch (error) {
       console.error('Google sign in error:', error);
