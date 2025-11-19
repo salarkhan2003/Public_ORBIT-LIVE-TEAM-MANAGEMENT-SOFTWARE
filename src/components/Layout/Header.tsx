@@ -21,15 +21,15 @@ export function Header({ onMenuClick }: HeaderProps) {
 
   const handleSignOut = async () => {
     setIsLoggingOut(true);
+    setShowUserMenu(false);
     try {
       toast.loading('Signing out...', { id: 'logout' });
       await signOut();
-      toast.success('Signed out successfully!', { id: 'logout' });
-    } catch {
+      // signOut will handle the redirect, so no need for success toast
+    } catch (error) {
+      console.error('Sign out error:', error);
       toast.error('Error signing out', { id: 'logout' });
-    } finally {
       setIsLoggingOut(false);
-      setShowUserMenu(false);
     }
   };
 
@@ -181,7 +181,10 @@ export function Header({ onMenuClick }: HeaderProps) {
                       <motion.button
                         whileHover={{ scale: 1.02, x: 4 }}
                         whileTap={{ scale: 0.98 }}
-                        onClick={() => setShowUserMenu(false)}
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          navigate('/settings');
+                        }}
                         className="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50 dark:hover:from-indigo-900/20 dark:hover:to-purple-900/20 rounded-xl transition-all touch-manipulation"
                       >
                         <User className="w-5 h-5" />

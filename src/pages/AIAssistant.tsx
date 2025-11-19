@@ -15,7 +15,7 @@ export function AIAssistant() {
   const [activeConversation, setActiveConversation] = useState<AIConversation | null>(null);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  const [loadingConversations, setLoadingConversations] = useState(true);
+  const [loadingConversations, setLoadingConversations] = useState(false); // Start with false
   const [suggestions] = useState<string[]>([
     "What tasks are assigned to me?",
     "Show me this week's deadlines",
@@ -28,9 +28,13 @@ export function AIAssistant() {
   const { user } = useAuth();
 
   const fetchConversations = useCallback(async () => {
-    if (!currentGroup || !user) return;
+    if (!currentGroup || !user) {
+      setLoadingConversations(false);
+      return;
+    }
 
     try {
+      setLoadingConversations(true);
       const { data, error } = await supabase
         .from('ai_conversations')
         .select('*')
@@ -40,8 +44,7 @@ export function AIAssistant() {
 
       if (error) {
         console.error('Error fetching conversations:', error);
-        toast.error('Failed to load conversations');
-        setLoadingConversations(false);
+        setConversations([]);
         return;
       }
 
@@ -50,8 +53,9 @@ export function AIAssistant() {
       if (data && data.length > 0 && !activeConversation) {
         setActiveConversation(data[0]);
       }
-    } catch {
-      toast.error('Failed to load conversations');
+    } catch (error) {
+      console.error('Error in fetchConversations:', error);
+      setConversations([]);
     } finally {
       setLoadingConversations(false);
     }
@@ -59,7 +63,11 @@ export function AIAssistant() {
 
   useEffect(() => {
     if (currentGroup && user) {
-      fetchConversations();
+      const timeout = setTimeout(() => setLoadingConversations(false), 3000);
+      fetchConversations().finally(() => clearTimeout(timeout));
+      return () => clearTimeout(timeout);
+    } else {
+      setLoadingConversations(false);
     }
   }, [currentGroup, user, fetchConversations]);
 

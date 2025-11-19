@@ -1,28 +1,111 @@
-import { FolderOpen, CheckSquare, Users, TrendingUp, RefreshCw } from 'lucide-react';
+import { FolderOpen, CheckSquare, Users, TrendingUp, RefreshCw, Sparkles } from 'lucide-react';
 import { RealTimeActivity } from '../components/Dashboard/RealTimeActivity';
 import { UpcomingDeadlines } from '../components/Dashboard/UpcomingDeadlines';
 import { AIInsights } from '../components/Dashboard/AIInsights';
-import { LoadingAnimation } from '../components/Shared/LoadingAnimation';
+import { WorkspaceTour } from '../components/Onboarding/WorkspaceTour';
 import { useDashboard } from '../hooks/useDashboard';
 import { useGroup } from '../hooks/useGroup';
 import { useAuth } from '../hooks/useAuth';
 import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
 
 export function Dashboard() {
   const { stats, recentActivity, upcomingDeadlines, loading, refreshData } = useDashboard();
   const { currentGroup } = useGroup();
   const { user } = useAuth();
+  const [showTour, setShowTour] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(12);
+
+  // Show tour on first workspace entry
+  useEffect(() => {
+    if (currentGroup && user) {
+      const tourCompleted = localStorage.getItem('workspaceTourCompleted');
+      if (!tourCompleted) {
+        // Small delay to let page load
+        setTimeout(() => {
+          setShowTour(true);
+        }, 1000);
+      }
+    }
+  }, [currentGroup, user]);
+
+  useEffect(() => {
+    if (!loading) return;
+    setLoadingProgress(12);
+    const interval = setInterval(() => {
+      setLoadingProgress(prev => {
+        const next = prev + Math.random() * 8;
+        return next >= 96 ? 96 : next;
+      });
+    }, 350);
+    return () => clearInterval(interval);
+  }, [loading]);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <LoadingAnimation variant="orbital" size="md" text="Loading Dashboard..." />
+      <div className="min-h-screen bg-[#05060a] text-white flex items-center justify-center px-4">
+        <div className="relative w-full max-w-2xl">
+          <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 via-purple-600 to-pink-500 blur-3xl opacity-30 animate-pulse" />
+          <div className="relative rounded-3xl bg-gradient-to-br from-gray-900 to-gray-950 border border-white/10 shadow-[0_20px_60px_rgba(0,0,0,0.45)] overflow-hidden p-8 sm:p-12">
+            <motion.div
+              className="absolute -right-10 -top-10 w-48 h-48 rounded-full bg-indigo-500/20 blur-3xl"
+              animate={{ scale: [1, 1.1, 1] }}
+              transition={{ duration: 6, repeat: Infinity }}
+            />
+            <motion.div
+              className="absolute -left-10 -bottom-10 w-60 h-60 rounded-full bg-purple-500/10 blur-3xl"
+              animate={{ scale: [1.1, 0.9, 1.1] }}
+              transition={{ duration: 8, repeat: Infinity }}
+            />
+
+            <div className="relative space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center backdrop-blur-lg border border-white/20">
+                  <Sparkles className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-[0.3em] text-white/50">Preparing Dashboard</p>
+                  <h1 className="text-2xl sm:text-3xl font-black">Aligning Your Workspace</h1>
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-white/5 border border-white/10 p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-white/60">Synchronizing insights</p>
+                  <p className="text-sm font-semibold text-white/80">{Math.round(loadingProgress)}%</p>
+                </div>
+                <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+                  <motion.div
+                    className="h-full rounded-full bg-gradient-to-r from-indigo-400 via-sky-400 to-cyan-300"
+                    animate={{ width: `${loadingProgress}%` }}
+                    transition={{ duration: 0.4 }}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                {[
+                  { label: 'Live Signals', value: 'Realtime', trend: '+6 updates' },
+                  { label: 'AI Briefing', value: 'Queued', trend: 'Ready in secs' }
+                ].map(card => (
+                  <div key={card.label} className="p-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur">
+                    <p className="text-white/50 text-xs">{card.label}</p>
+                    <p className="text-lg font-semibold">{card.value}</p>
+                    <p className="text-[11px] text-emerald-300/80 mt-1">{card.trend}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#0a0a0a] transition-colors duration-300">
+    <>
+      {showTour && <WorkspaceTour onComplete={() => setShowTour(false)} />}
+      <div className="min-h-screen bg-white dark:bg-[#0a0a0a] transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8 space-y-4 sm:space-y-6 md:space-y-8">
         {/* Header - ElevenLabs Clean Style */}
         <motion.div
@@ -187,6 +270,7 @@ export function Dashboard() {
         )}
       </div>
     </div>
+    </>
   );
 }
 

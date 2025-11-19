@@ -16,7 +16,7 @@ interface ProjectWithCreator extends Project {
 
 export function Projects() {
   const [projects, setProjects] = useState<ProjectWithCreator[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Start with false
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [viewingProject, setViewingProject] = useState<Project | null>(null);
@@ -26,9 +26,13 @@ export function Projects() {
   const { currentGroup, groupMembers } = useGroup();
 
   const fetchProjects = useCallback(async () => {
-    if (!currentGroup) return;
+    if (!currentGroup) {
+      setLoading(false);
+      return;
+    }
 
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('projects')
         .select(`
@@ -38,11 +42,15 @@ export function Projects() {
         .eq('group_id', currentGroup.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching projects:', error);
+        setProjects([]);
+        return;
+      }
       setProjects(data || []);
     } catch (error) {
       console.error('Error fetching projects:', error);
-      toast.error('Failed to load projects');
+      setProjects([]);
     } finally {
       setLoading(false);
     }
@@ -50,7 +58,12 @@ export function Projects() {
 
   useEffect(() => {
     if (currentGroup) {
-      fetchProjects();
+      // Add timeout to prevent infinite loading
+      const timeout = setTimeout(() => {
+        setLoading(false);
+      }, 3000);
+
+      fetchProjects().finally(() => clearTimeout(timeout));
       
       // Set up real-time subscription
       const subscription = supabase
@@ -69,6 +82,7 @@ export function Projects() {
         .subscribe();
 
       return () => {
+        clearTimeout(timeout);
         subscription.unsubscribe();
       };
     }

@@ -145,7 +145,10 @@ export function useGroup(authReady: boolean = true) {
           if (membership) {
             console.log('✅ Cached workspace verified, user is still member');
             setCurrentGroup(workspace);
-            await fetchGroupMembers(workspace.id);
+            // Fetch members in background without blocking
+            fetchGroupMembers(workspace.id).catch(err => 
+              console.error('Warning: Failed to fetch members:', err)
+            );
             setLoading(false);
             return;
           } else {
@@ -195,7 +198,12 @@ export function useGroup(authReady: boolean = true) {
         if (grp) {
           console.log('✅ User is member of group:', grp.name);
           setCurrentGroup(grp as Group);
-          await fetchGroupMembers(grp.id);
+          // Save to localStorage
+          localStorage.setItem('currentWorkspace', JSON.stringify(grp));
+          // Fetch members in background without blocking
+          fetchGroupMembers(grp.id).catch(err => 
+            console.error('Warning: Failed to fetch members:', err)
+          );
           setLoading(false);
           return;
         } else {
@@ -227,7 +235,7 @@ export function useGroup(authReady: boolean = true) {
     const checkUser = async () => {
       if (!authReady) {
         console.log('Auth not ready, waiting...');
-        setLoading(true);
+        setLoading(false); // Don't show loading if auth isn't ready
         return;
       }
 
@@ -240,10 +248,11 @@ export function useGroup(authReady: boolean = true) {
         initializedRef.current = false;
         lastUserIdRef.current = currentUserId;
 
-        // If user logged out, clear workspace
+        // If user logged out, clear state but keep localStorage for re-login
         if (!currentUserId) {
           setCurrentGroup(null);
           setGroupMembers([]);
+          // DON'T clear localStorage - user will rejoin their workspace on re-login
           setLoading(false);
           return;
         }
@@ -253,9 +262,7 @@ export function useGroup(authReady: boolean = true) {
       if (initializedRef.current && currentUserId === lastUserIdRef.current) {
         console.log('Group already initialized for current user, skipping');
         // Make sure loading is false if already initialized
-        if (loading) {
-          setLoading(false);
-        }
+        setLoading(false);
         return;
       }
 
@@ -265,42 +272,64 @@ export function useGroup(authReady: boolean = true) {
         await checkUserGroup();
       } else {
         // No user, set loading to false
+        setCurrentGroup(null);
+        setGroupMembers([]);
         setLoading(false);
       }
     };
 
     checkUser();
 
-    // Real-time subscription for group changes
-    const subscription = supabase
-      .channel('group-membership-changes')
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'group_members' },
-        () => {
-          console.log('Group membership changed, refreshing...');
-          checkUserGroup();
-        }
-      )
-      .subscribe();
+    // Real-time subscription for group changes - only if user is logged in
+    let subscription: ReturnType<typeof supabase.channel> | null = null;
+    
+    if (authReady) {
+      subscription = supabase
+        .channel('group-membership-changes')
+        .on('postgres_changes',
+          { event: '*', schema: 'public', table: 'group_members' },
+          () => {
+            console.log('Group membership changed, refreshing...');
+            // Only refresh if we have a user
+            const userResp = supabase.auth.getUser();
+            userResp.then(({ data: { user } }) => {
+              if (user && user.id === lastUserIdRef.current) {
+                checkUserGroup();
+              }
+            });
+          }
+        )
+        .subscribe();
+    }
 
     return () => {
-      console.log('Group cleanup - maintaining user state');
-      subscription.unsubscribe();
+      console.log('Group cleanup');
+      if (subscription) {
+        subscription.unsubscribe();
+      }
     };
   }, [authReady, checkUserGroup]);
 
 
   const joinGroup = async (groupCode: string) => {
+    console.log('🔄 joinGroup called with code:', groupCode);
     setLoading(true);
+    
     try {
       const userResp = await supabase.auth.getUser();
       const user = userResp?.data?.user ?? null;
-      if (!user) throw new Error('Not authenticated');
+      
+      if (!user) {
+        setLoading(false);
+        throw new Error('Not authenticated');
+      }
 
-      console.log('Joining group with code:', groupCode);
+      console.log('User authenticated:', user.email);
 
       // Find group by code - case insensitive
       const normalizedCode = groupCode.toUpperCase().trim();
+      console.log('Looking up group with code:', normalizedCode);
+      
       const { data: group, error: groupError } = await supabase
         .from('groups')
         .select('*')
@@ -309,15 +338,17 @@ export function useGroup(authReady: boolean = true) {
 
       if (groupError) {
         console.error('Group lookup error:', groupError);
-        throw new Error('Failed to lookup group. Please try again.');
+        setLoading(false);
+        throw new Error('Failed to lookup workspace. Please try again.');
       }
 
       if (!group) {
         console.error('No group found with code:', normalizedCode);
-        throw new Error('Invalid group code. Please check and try again.');
+        setLoading(false);
+        throw new Error('No workspace found with that code');
       }
 
-      console.log('Found group:', group.name);
+      console.log('✅ Found group:', group.name, 'ID:', group.id);
 
       // Check if user is already a member - SIMPLE QUERY
       const { data: anyMembership } = await supabase
@@ -538,6 +569,23 @@ export function useGroup(authReady: boolean = true) {
     }
   };
 
+  const refreshGroupSilent = useCallback(async () => {
+    // Refresh without showing loading screen
+    try {
+      const userResp = await supabase.auth.getUser();
+      const user = userResp?.data?.user ?? null;
+
+      if (!user || !currentGroup) {
+        return;
+      }
+
+      // Fetch members without setting loading state
+      await fetchGroupMembers(currentGroup.id);
+    } catch (error) {
+      console.error('Error refreshing group:', error);
+    }
+  }, [currentGroup, fetchGroupMembers]);
+
   return {
     currentGroup,
     groupMembers,
@@ -545,6 +593,6 @@ export function useGroup(authReady: boolean = true) {
     joinGroup,
     createGroup,
     leaveGroup,
-    refreshGroup: checkUserGroup,
+    refreshGroup: refreshGroupSilent,
   };
 }

@@ -7,13 +7,17 @@ import toast from 'react-hot-toast';
 export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Start with false
   const { user } = useAuth();
 
   const fetchNotifications = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
@@ -21,12 +25,19 @@ export function useNotifications() {
         .order('created_at', { ascending: false })
         .limit(50);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching notifications:', error);
+        setNotifications([]);
+        setUnreadCount(0);
+        return;
+      }
 
       setNotifications(data || []);
       setUnreadCount(data?.filter(n => !n.read).length || 0);
     } catch (error) {
       console.error('Error fetching notifications:', error);
+      setNotifications([]);
+      setUnreadCount(0);
     } finally {
       setLoading(false);
     }
@@ -34,7 +45,12 @@ export function useNotifications() {
 
   useEffect(() => {
     if (user) {
-      fetchNotifications();
+      // Add timeout to prevent infinite loading
+      const timeout = setTimeout(() => {
+        setLoading(false);
+      }, 3000);
+
+      fetchNotifications().finally(() => clearTimeout(timeout));
 
       // Real-time subscription
       const channel = supabase
@@ -54,8 +70,11 @@ export function useNotifications() {
         .subscribe();
 
       return () => {
+        clearTimeout(timeout);
         channel.unsubscribe();
       };
+    } else {
+      setLoading(false);
     }
   }, [user, fetchNotifications]);
 

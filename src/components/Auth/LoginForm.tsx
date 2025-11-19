@@ -79,55 +79,104 @@ export function LoginForm({ onBackToLanding }: LoginFormProps) {
 		}
 
 		setLoading(true);
+		console.log('🔐 Starting authentication...', isLogin ? 'Login' : 'Signup');
+
+		// Add timeout protection
+		const timeout = setTimeout(() => {
+			console.warn('⏱️ Authentication timeout');
+			setLoading(false);
+			toast.error('Request timed out. Please try again.');
+		}, 15000); // 15 second timeout
 
 		try {
 			if (isLogin) {
-				await signIn(formData.email.trim(), formData.password);
-				toast.success('Welcome back!');
+				console.log('📧 Signing in with email:', formData.email);
+				const result = await signIn(formData.email.trim(), formData.password);
+				clearTimeout(timeout);
+				
+				if (result?.user) {
+					console.log('✅ Login successful');
+					toast.success('Welcome back!');
+					setLoading(false);
+					// Redirect to dashboard
+					setTimeout(() => {
+						window.location.href = '/dashboard';
+					}, 300);
+				} else {
+					setLoading(false);
+					toast.error('Login failed. Please try again.');
+				}
 			} else {
-				console.log('Starting signup with:', { email: formData.email, name: formData.name });
+				console.log('📝 Creating account for:', formData.email);
 				const result = await signUp(formData.email.trim(), formData.password, formData.name.trim());
-				console.log('Signup completed:', result);
+				clearTimeout(timeout);
+				
+				console.log('Signup result:', result);
 
 				// Check if email confirmation is required
 				if (result?.user && !result?.session) {
+					console.log('📧 Email confirmation required');
 					toast.success('Account created! Please check your email to confirm your account.', {
-						duration: 6000,
+						duration: 8000,
 					});
-					// Switch to login mode so user can try logging in after confirming email
+					setLoading(false);
 					setIsLogin(true);
+					setFormData({ email: formData.email, password: '', name: '' });
 				} else if (result?.session) {
-					// User is authenticated and has a session
-					toast.success('Account created successfully! Welcome to TrackBoss.AI!');
+					console.log('✅ Account created with session');
+					toast.success('Account created! Welcome to ORBIT LIVE!');
+					setLoading(false);
+					setTimeout(() => {
+						window.location.href = '/dashboard';
+					}, 300);
 				} else {
+					console.log('✅ Account created');
 					toast.success('Account created! You can now sign in.');
+					setLoading(false);
 					setIsLogin(true);
+					setFormData({ email: formData.email, password: '', name: '' });
 				}
 			}
 		} catch (error) {
-			console.error('Authentication error:', error);
-			// Show the ACTUAL error message from Supabase
-			const errorMessage = error instanceof Error ? error.message : 'An error occurred during authentication';
-			console.error('Displaying error:', errorMessage);
-			toast.error(errorMessage);
-		} finally {
+			clearTimeout(timeout);
+			console.error('❌ Authentication error:', error);
 			setLoading(false);
+			
+			const errorMessage = error instanceof Error ? error.message : 'An error occurred during authentication';
+			console.error('Error message:', errorMessage);
+			toast.error(errorMessage, { duration: 5000 });
 		}
 	};
 
 	const handleGoogleSignIn = async () => {
 		setGoogleLoading(true);
+		console.log('🔐 Starting Google OAuth...');
+		
+		// Add timeout protection
+		const timeout = setTimeout(() => {
+			console.warn('⏱️ Google OAuth timeout');
+			setGoogleLoading(false);
+			toast.error('Request timed out. Please try again.');
+		}, 10000); // 10 second timeout
+
 		try {
 			const result = await signInWithGoogle();
+			clearTimeout(timeout);
+			
 			if (result?.url) {
+				console.log('✅ Redirecting to Google OAuth...');
 				toast.success('Redirecting to Google...');
+				// Redirect to Google OAuth
 				window.location.href = result.url;
+				// Keep loading state true during redirect
 			} else {
+				console.error('❌ No OAuth URL returned');
 				toast.error('Failed to initiate Google sign-in');
 				setGoogleLoading(false);
 			}
 		} catch (error) {
-			console.error('Google sign-in error:', error);
+			clearTimeout(timeout);
+			console.error('❌ Google sign-in error:', error);
 			const errorMessage = error instanceof Error ? error.message : 'Failed to sign in with Google';
 			toast.error(errorMessage);
 			setGoogleLoading(false);

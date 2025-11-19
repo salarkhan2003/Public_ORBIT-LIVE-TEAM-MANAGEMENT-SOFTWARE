@@ -50,7 +50,7 @@ export function Calendar() {
 
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [filteredEvents, setFilteredEvents] = useState<CalendarEvent[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Start with false
   const [currentView, setCurrentView] = useState('dayGridMonth');
   const [showEventModal, setShowEventModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -142,10 +142,11 @@ export function Calendar() {
   };
 
   useEffect(() => {
-    fetchEvents();
-
-    // Real-time subscription for events
     if (currentGroup) {
+      const timeout = setTimeout(() => setLoading(false), 3000);
+      fetchEvents();
+
+      // Real-time subscription for events
       const subscription = supabase
         .channel('calendar_events')
         .on('postgres_changes',
@@ -162,8 +163,11 @@ export function Calendar() {
         .subscribe();
 
       return () => {
+        clearTimeout(timeout);
         subscription.unsubscribe();
       };
+    } else {
+      setLoading(false);
     }
   }, [currentGroup]);
 

@@ -30,7 +30,7 @@ interface Document {
 
 export function Documents() {
   const [documents, setDocuments] = useState<Document[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Start with false
   const [uploading, setUploading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -45,9 +45,13 @@ export function Documents() {
 
   // Fetch documents
   const fetchDocuments = useCallback(async () => {
-    if (!currentGroup) return;
+    if (!currentGroup) {
+      setLoading(false);
+      return;
+    }
 
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('documents')
         .select(`
@@ -58,19 +62,29 @@ export function Documents() {
         .eq('is_archived', false)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching documents:', error);
+        setDocuments([]);
+        return;
+      }
       setDocuments(data || []);
     } catch (error) {
       console.error('Error fetching documents:', error);
-      toast.error('Failed to load documents');
+      setDocuments([]);
     } finally {
       setLoading(false);
     }
   }, [currentGroup]);
 
   useEffect(() => {
-    fetchDocuments();
-  }, [fetchDocuments]);
+    if (currentGroup) {
+      const timeout = setTimeout(() => setLoading(false), 3000);
+      fetchDocuments().finally(() => clearTimeout(timeout));
+      return () => clearTimeout(timeout);
+    } else {
+      setLoading(false);
+    }
+  }, [fetchDocuments, currentGroup]);
 
   // Handle file selection
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {

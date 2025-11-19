@@ -54,45 +54,57 @@ export function useDashboard() {
   });
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [upcomingDeadlines, setUpcomingDeadlines] = useState<UpcomingDeadline[]>([]);
-  const [loading, setLoading] = useState(true);
-  
+  const [loading, setLoading] = useState(false); // Start with false for instant load
+
   const { currentGroup, groupMembers } = useGroup();
   const { user } = useAuth();
 
   useEffect(() => {
     if (currentGroup && user) {
-      fetchDashboardData();
-      
+      // Add 3 second timeout to force loading to stop
+      const timeout = setTimeout(() => {
+        console.log('Dashboard load timeout - forcing completion');
+        setLoading(false);
+      }, 3000);
+
+      fetchDashboardData().finally(() => clearTimeout(timeout));
+
       // Set up real-time subscriptions
       const subscriptions = setupRealtimeSubscriptions();
-      
+
       return () => {
+        clearTimeout(timeout);
         subscriptions.forEach(sub => sub.unsubscribe());
       };
     } else if (!currentGroup && user) {
       // User is logged in but no group - stop loading
+      setLoading(false);
+    } else {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentGroup, user]);
 
   const fetchDashboardData = async () => {
-    if (!currentGroup) return;
+    if (!currentGroup) {
+      setLoading(false);
+      return;
+    }
 
     try {
       setLoading(true);
-      
-      // Fetch all data in parallel
+
+      // Fetch all data in parallel with error handling for each
       const [
         projectsData,
         tasksData,
         activityData,
         deadlinesData
       ] = await Promise.all([
-        fetchProjects(),
-        fetchTasks(),
-        fetchRecentActivity(),
-        fetchUpcomingDeadlines()
+        fetchProjects().catch(err => { console.error('Projects fetch failed:', err); return []; }),
+        fetchTasks().catch(err => { console.error('Tasks fetch failed:', err); return []; }),
+        fetchRecentActivity().catch(err => { console.error('Activity fetch failed:', err); return []; }),
+        fetchUpcomingDeadlines().catch(err => { console.error('Deadlines fetch failed:', err); return []; })
       ]);
 
       // Calculate stats
@@ -100,40 +112,51 @@ export function useDashboard() {
       const completedTasks = tasksData.filter(t => t.status === 'done').length;
       const totalTasks = tasksData.length;
       const teamMembers = groupMembers.length;
-      
+
       // Calculate productivity (tasks completed / total tasks * 100)
       const productivity = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-      // Calculate trends from historical data (last 30 days comparison)
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-      // Fetch historical stats for trend calculation
-      const { data: historicalTasks } = await supabase
-        .from('tasks')
-        .select('id, status, created_at')
-        .eq('group_id', currentGroup!.id)
-        .lt('created_at', thirtyDaysAgo.toISOString());
-
-      const { data: historicalProjects } = await supabase
-        .from('projects')
-        .select('id, status, created_at')
-        .eq('group_id', currentGroup!.id)
-        .lt('created_at', thirtyDaysAgo.toISOString());
-
-      const historicalActiveProjects = (historicalProjects || []).filter(p => p.status === 'active').length;
-      const historicalCompletedTasks = (historicalTasks || []).filter(t => t.status === 'done').length;
-      const historicalTotalTasks = (historicalTasks || []).length;
-      const historicalProductivity = historicalTotalTasks > 0
-        ? Math.round((historicalCompletedTasks / historicalTotalTasks) * 100)
-        : 0;
-
-      const trends = {
-        projects: activeProjects - historicalActiveProjects,
-        tasks: completedTasks - historicalCompletedTasks,
-        members: 0, // Would need historical membership data
-        productivity: productivity - historicalProductivity
+      // Calculate trends from historical data (last 30 days comparison) - non-blocking
+      let trends = {
+        projects: 0,
+        tasks: 0,
+        members: 0,
+        productivity: 0
       };
+
+      try {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        // Fetch historical stats for trend calculation
+        const { data: historicalTasks } = await supabase
+          .from('tasks')
+          .select('id, status, created_at')
+          .eq('group_id', currentGroup!.id)
+          .lt('created_at', thirtyDaysAgo.toISOString());
+
+        const { data: historicalProjects } = await supabase
+          .from('projects')
+          .select('id, status, created_at')
+          .eq('group_id', currentGroup!.id)
+          .lt('created_at', thirtyDaysAgo.toISOString());
+
+        const historicalActiveProjects = (historicalProjects || []).filter(p => p.status === 'active').length;
+        const historicalCompletedTasks = (historicalTasks || []).filter(t => t.status === 'done').length;
+        const historicalTotalTasks = (historicalTasks || []).length;
+        const historicalProductivity = historicalTotalTasks > 0
+          ? Math.round((historicalCompletedTasks / historicalTotalTasks) * 100)
+          : 0;
+
+        trends = {
+          projects: activeProjects - historicalActiveProjects,
+          tasks: completedTasks - historicalCompletedTasks,
+          members: 0, // Would need historical membership data
+          productivity: productivity - historicalProductivity
+        };
+      } catch (trendError) {
+        console.warn('Could not calculate trends:', trendError);
+      }
 
       setStats({
         activeProjects,
@@ -146,22 +169,39 @@ export function useDashboard() {
 
       setRecentActivity(activityData);
       setUpcomingDeadlines(deadlinesData);
-      
+
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+      // Set default stats on error so UI still renders
+      setStats({
+        activeProjects: 0,
+        completedTasks: 0,
+        totalTasks: 0,
+        teamMembers: groupMembers.length,
+        productivity: 0,
+        trends: { projects: 0, tasks: 0, members: 0, productivity: 0 }
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const fetchProjects = async () => {
-    const { data, error } = await supabase
-      .from('projects')
-      .select('*')
-      .eq('group_id', currentGroup!.id);
-    
-    if (error) throw error;
-    return data || [];
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('group_id', currentGroup!.id);
+
+      if (error) {
+        console.error('Error fetching projects:', error);
+        return [];
+      }
+      return data || [];
+    } catch (error) {
+      console.error('Error in fetchProjects:', error);
+      return [];
+    }
   };
 
   const fetchTasks = async () => {
@@ -255,13 +295,13 @@ export function useDashboard() {
     try {
       const tasksSubscription = supabase
         .channel(`dashboard-tasks-${currentGroup!.id}`)
-        .on('postgres_changes', 
-          { 
-            event: '*', 
-            schema: 'public', 
+        .on('postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
             table: 'tasks',
             filter: `group_id=eq.${currentGroup!.id}`
-          }, 
+          },
           () => {
             fetchDashboardData();
           }
@@ -271,13 +311,13 @@ export function useDashboard() {
       // Subscribe to projects changes
       const projectsSubscription = supabase
         .channel(`dashboard-projects-${currentGroup!.id}`)
-        .on('postgres_changes', 
-          { 
-            event: '*', 
-            schema: 'public', 
+        .on('postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
             table: 'projects',
             filter: `group_id=eq.${currentGroup!.id}`
-          }, 
+          },
           () => {
             fetchDashboardData();
           }
@@ -287,13 +327,13 @@ export function useDashboard() {
       // Subscribe to activity logs
       const activitySubscription = supabase
         .channel(`dashboard-activity-${currentGroup!.id}`)
-        .on('postgres_changes', 
-          { 
-            event: 'INSERT', 
-            schema: 'public', 
+        .on('postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
             table: 'activity_logs',
             filter: `group_id=eq.${currentGroup!.id}`
-          }, 
+          },
           () => {
             fetchDashboardData();
           }
@@ -365,11 +405,52 @@ export function useDashboard() {
     return `${Math.floor(diffInSeconds / 604800)} weeks ago`;
   };
 
+  const refreshDataSilent = async () => {
+    // Refresh without showing loading screen
+    if (!currentGroup) return;
+
+    try {
+      // Fetch all data in parallel with error handling for each
+      const [
+        projectsData,
+        tasksData,
+        activityData,
+        deadlinesData
+      ] = await Promise.all([
+        fetchProjects().catch(err => { console.error('Projects fetch failed:', err); return []; }),
+        fetchTasks().catch(err => { console.error('Tasks fetch failed:', err); return []; }),
+        fetchRecentActivity().catch(err => { console.error('Activity fetch failed:', err); return []; }),
+        fetchUpcomingDeadlines().catch(err => { console.error('Deadlines fetch failed:', err); return []; })
+      ]);
+
+      // Calculate stats
+      const activeProjects = projectsData.filter(p => p.status === 'active').length;
+      const completedTasks = tasksData.filter(t => t.status === 'done').length;
+      const totalTasks = tasksData.length;
+      const teamMembers = groupMembers.length;
+      const productivity = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+      setStats({
+        activeProjects,
+        completedTasks,
+        totalTasks,
+        teamMembers,
+        productivity,
+        trends: stats.trends // Keep existing trends
+      });
+
+      setRecentActivity(activityData);
+      setUpcomingDeadlines(deadlinesData);
+    } catch (error) {
+      console.error('Error refreshing dashboard:', error);
+    }
+  };
+
   return {
     stats,
     recentActivity,
     upcomingDeadlines,
     loading,
-    refreshData: fetchDashboardData
+    refreshData: refreshDataSilent
   };
 }

@@ -30,6 +30,19 @@ function App() {
   const { currentGroup, loading: groupLoading } = useGroup(!authLoading);
   const [showProfileSetup, setShowProfileSetup] = React.useState(false);
   const [showLanding, setShowLanding] = React.useState(true);
+  const [forceShowApp, setForceShowApp] = React.useState(false);
+
+  // Safety timeout - if loading takes too long, force show the app
+  React.useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (authLoading || groupLoading) {
+        console.warn('Loading timeout - forcing app to show');
+        setForceShowApp(true);
+      }
+    }, 5000); // 5 second max
+
+    return () => clearTimeout(timeout);
+  }, [authLoading, groupLoading]);
 
   // Comprehensive mobile optimizations
   React.useEffect(() => {
@@ -99,14 +112,20 @@ function App() {
   // If user is authenticated, don't show landing page
   React.useEffect(() => {
     if (user) {
+      console.log('✅ User authenticated, hiding landing page');
       setShowLanding(false);
+    } else {
+      console.log('❌ No user, may show landing page');
     }
   }, [user]);
 
-  // Show loading spinner while checking auth
-  if (authLoading) {
+  // Show loading spinner while checking auth (with timeout protection)
+  if (authLoading && !forceShowApp) {
+    console.log('🔄 Auth loading, showing loader...');
     return <FullPageLoader message="Loading ORBIT LIVE..." />;
   }
+  
+  console.log('✅ Auth ready, user:', user?.email || 'none', 'forceShowApp:', forceShowApp);
 
   // User not logged in - show landing page or login
   if (!user) {
@@ -140,13 +159,22 @@ function App() {
   }
 
   // User is logged in - show loading while checking workspace (but with timeout protection)
-  if (groupLoading) {
+  // Only show loading if auth is ready and we're actually checking workspace
+  if (groupLoading && !authLoading && !forceShowApp) {
     console.log('Group loading, showing workspace setup message...');
     return <FullPageLoader message="Setting up your workspace..." />;
+  }
+  
+  // If auth is still loading, show auth loading message
+  if (authLoading && !forceShowApp) {
+    return <FullPageLoader message="Loading ORBIT LIVE..." />;
   }
 
   // Check if user wants to skip workspace setup (stored in localStorage)
   const hasSkippedWorkspace = localStorage.getItem('skipWorkspace') === 'true';
+  
+  // Check if we have a cached workspace that's being verified
+  const hasCachedWorkspace = localStorage.getItem('currentWorkspace') !== null;
 
   // Wrap everything in Router since we need navigation everywhere
   return (
@@ -158,7 +186,7 @@ function App() {
         {/* Show profile setup if needed */}
         {showProfileSetup ? (
           <Route path="*" element={<ProfileSetup onComplete={() => setShowProfileSetup(false)} />} />
-        ) : !currentGroup && !hasSkippedWorkspace ? (
+        ) : !currentGroup && !hasSkippedWorkspace && !hasCachedWorkspace ? (
           /* User needs to join/create a workspace OR can skip */
           <Route path="*" element={<GroupJoin />} />
         ) : (

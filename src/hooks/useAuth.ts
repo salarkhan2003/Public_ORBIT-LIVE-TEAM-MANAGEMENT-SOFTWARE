@@ -7,6 +7,7 @@ export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const initializedRef = useRef(false);
+  const currentUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     // Prevent double initialization in React 18 Strict Mode
@@ -17,54 +18,89 @@ export function useAuth() {
 
     initializedRef.current = true;
     let mounted = true;
-    let initialLoadComplete = false;
+    let authStateListener: { subscription?: { unsubscribe: () => void }; unsubscribe?: () => void } | null = null;
 
     const init = async () => {
-      setLoading(true);
       try {
+        setLoading(true);
         console.log('Initializing auth...');
-        const userResp = await supabase.auth.getUser();
-        const currentUser = userResp?.data?.user ?? null;
 
-        console.log('Current user:', currentUser?.id);
+        // Add timeout to prevent infinite loading
+        const timeoutId = setTimeout(() => {
+          console.log('Auth initialization timeout - forcing loading to false');
+          if (mounted) {
+            setLoading(false);
+            setUser(null);
+          }
+        }, 5000); // 5 second timeout
 
-        if (!mounted) {
-          console.log('Component unmounted, aborting init');
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        
+        // Clear timeout if we got a response
+        clearTimeout(timeoutId);
+        
+        if (sessionError) {
+          console.error('Session error:', sessionError);
+          await supabase.auth.signOut();
+          setUser(null);
+          setLoading(false);
           return;
         }
 
+        if (!mounted) {
+          setLoading(false);
+          return;
+        }
+
+        const currentUser = sessionData?.session?.user ?? null;
         if (currentUser) {
+          console.log('User session found:', currentUser.email);
+          setUser({
+            id: currentUser.id,
+            email: currentUser.email || '',
+            name: currentUser.email?.split('@')[0] || 'User',
+            role: 'developer',
+            title: 'Team Member',
+            created_at: new Date().toISOString()
+          } as User);
+          setLoading(false); // Set loading false immediately
+
           try {
             await fetchOrCreateUserProfile(currentUser);
-            console.log('Profile fetch/create completed');
           } catch (profileError) {
-            console.error('Profile error (non-blocking):', profileError);
-            // Set a minimal user object so app can continue
-            if (mounted) {
-              setUser({
-                id: currentUser.id,
-                email: currentUser.email || '',
-                name: currentUser.email?.split('@')[0] || 'User',
-                role: 'developer',
-                title: 'Team Member',
-                created_at: new Date().toISOString()
-              } as User);
-            }
+            console.warn('Profile fetch/create failed:', profileError);
           }
         } else {
-          console.log('No current user, setting user to null');
-          setUser(null);
+          console.log('No session found, checking for user...');
+          const userResp = await supabase.auth.getUser();
+          const fetchedUser = userResp?.data?.user ?? null;
+          if (fetchedUser) {
+            console.log('User found:', fetchedUser.email);
+            setUser({
+              id: fetchedUser.id,
+              email: fetchedUser.email || '',
+              name: fetchedUser.email?.split('@')[0] || 'User',
+              role: 'developer',
+              title: 'Team Member',
+              created_at: new Date().toISOString()
+            } as User);
+            setLoading(false); // Set loading false immediately
+            try {
+              await fetchOrCreateUserProfile(fetchedUser);
+            } catch (profileError) {
+              console.warn('Profile fetch/create failed:', profileError);
+            }
+          } else {
+            console.log('No user found - user is logged out');
+            setUser(null);
+            setLoading(false); // Set loading false for no user
+          }
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
         if (mounted) {
           setUser(null);
-        }
-      } finally {
-        if (mounted) {
-          console.log('Auth loading complete, setting loading to false');
-          setLoading(false);
-          initialLoadComplete = true;
+          setLoading(false); // Always set loading false on error
         }
       }
     };
@@ -73,25 +109,33 @@ export function useAuth() {
 
     // Listen for auth changes
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event);
+      console.log('Auth state changed:', event, session?.user?.id);
 
-      // Don't process during unmount or initial load
+      // Don't process during unmount
       if (!mounted) return;
-
-      // Skip SIGNED_IN event during initial load to prevent double profile fetch
-      if (event === 'SIGNED_IN' && !initialLoadComplete) {
-        console.log('Skipping SIGNED_IN during initial load');
-        return;
-      }
 
       try {
         const currentUser = session?.user ?? null;
+
+        if (event === 'SIGNED_OUT') {
+          console.log('User signed out');
+          setUser(null);
+          currentUserIdRef.current = null;
+          setLoading(false);
+          return;
+        }
+
         if (currentUser) {
-          try {
-            await fetchOrCreateUserProfile(currentUser);
-          } catch (profileError) {
-            console.error('Profile error in auth change (non-blocking):', profileError);
-            // Set minimal user so app continues
+          // Skip if this is the same user we already processed
+          if (currentUserIdRef.current === currentUser.id && event === 'SIGNED_IN') {
+            console.log('Skipping duplicate profile fetch for same user');
+            setLoading(false); // Ensure loading is false
+            return;
+          }
+
+          // Handle email confirmation
+          if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
+            currentUserIdRef.current = currentUser.id;
             setUser({
               id: currentUser.id,
               email: currentUser.email || '',
@@ -100,29 +144,47 @@ export function useAuth() {
               title: 'Team Member',
               created_at: new Date().toISOString()
             } as User);
+            setLoading(false); // Set loading false immediately after setting user
+            try {
+              await fetchOrCreateUserProfile(currentUser);
+            } catch (profileError) {
+              console.warn('Profile error in auth change:', profileError);
+            }
           }
         } else {
           setUser(null);
+          currentUserIdRef.current = null;
+          setLoading(false);
         }
       } catch (error) {
         console.error('Auth state change handler error:', error);
-        setUser(null);
+        if (mounted) {
+          setUser(null);
+          currentUserIdRef.current = null;
+          setLoading(false);
+        }
       }
     });
 
+    authStateListener = listener;
+
     return () => {
-      console.log('Auth cleanup - resetting initialized flag');
+      console.log('Auth cleanup');
       mounted = false;
-      initializedRef.current = false; // Reset so it can initialize again on remount
+      // Allow re-initialization (needed for React Strict Mode double-mount)
+      initializedRef.current = false;
+      currentUserIdRef.current = null;
+      // Ensure loading is reset on cleanup to prevent stuck loading state
+      setLoading(false);
       // listener may have different shapes across supabase client versions
       try {
-        // v2 shape: listener?.subscription?.unsubscribe()
-        // v1 shape: listener?.unsubscribe()
-        const listenerObj = listener as { subscription?: { unsubscribe: () => void }; unsubscribe?: () => void };
-        if (listenerObj?.subscription?.unsubscribe) {
-          listenerObj.subscription.unsubscribe();
-        } else if (listenerObj?.unsubscribe) {
-          listenerObj.unsubscribe();
+        if (authStateListener) {
+          const listenerObj = authStateListener as { subscription?: { unsubscribe: () => void }; unsubscribe?: () => void };
+          if (listenerObj?.subscription?.unsubscribe) {
+            listenerObj.subscription.unsubscribe();
+          } else if (listenerObj?.unsubscribe) {
+            listenerObj.unsubscribe();
+          }
         }
       } catch {
         // ignore cleanup errors
@@ -178,8 +240,8 @@ export function useAuth() {
           supabaseUserObj.email?.split('@')[0] ||
           'User',
         avatar: (metadata?.avatar_url as string) ||
-                (metadata?.picture as string) ||
-                undefined,
+          (metadata?.picture as string) ||
+          undefined,
         role: 'developer',
         title: 'Team Member',
         created_at: new Date().toISOString(),
@@ -255,10 +317,38 @@ export function useAuth() {
     try {
       setLoading(true);
       console.log('Signing in user...');
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password
+      });
+
+      if (error) {
+        console.error('Sign in error:', error);
+
+        // Provide user-friendly error messages
+        if (error.message.includes('Invalid login credentials') || error.message.includes('Invalid email or password')) {
+          throw new Error('Invalid email or password. Please check your credentials and try again.');
+        }
+
+        if (error.message.includes('Email not confirmed')) {
+          throw new Error('Please confirm your email address before signing in. Check your inbox for the confirmation link.');
+        }
+
+        if (error.message.includes('too many requests')) {
+          throw new Error('Too many login attempts. Please wait a few minutes and try again.');
+        }
+
+        throw new Error(error.message || 'Failed to sign in. Please try again.');
+      }
+
       if (data?.user) {
         console.log('Sign in successful, user:', data.user.id);
+
+        // Check if email is confirmed
+        if (!data.user.email_confirmed_at && data.user.email) {
+          console.warn('User email not confirmed');
+        }
+
         try {
           await fetchOrCreateUserProfile(data.user);
         } catch (profileError) {
@@ -266,6 +356,7 @@ export function useAuth() {
           // Don't throw - user can still use the app
         }
       }
+
       return data;
     } catch (error: unknown) {
       console.error('Sign in error:', error);
@@ -284,7 +375,7 @@ export function useAuth() {
       const emailRedirectTo = `${origin}/auth/callback`;
 
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: email.trim().toLowerCase(),
         password,
         options: {
           data: {
@@ -307,10 +398,19 @@ export function useAuth() {
         }
 
         // Provide more helpful error messages
-        if (error.message.includes('already registered')) {
+        if (error.message.includes('already registered') || error.message.includes('already exists') || error.message.includes('User already registered')) {
           throw new Error('This email is already registered. Please sign in instead.');
         }
-        throw new Error(error.message || 'Failed to create account');
+
+        if (error.message.includes('Password')) {
+          throw new Error('Password does not meet requirements. Please use a stronger password.');
+        }
+
+        if (error.message.includes('Invalid email')) {
+          throw new Error('Please enter a valid email address.');
+        }
+
+        throw new Error(error.message || 'Failed to create account. Please try again.');
       }
 
       if (data?.user) {
@@ -377,20 +477,39 @@ export function useAuth() {
 
   const signOut = async () => {
     try {
-      // Immediately clear user state for instant UI feedback
-      setUser(null);
-
-      // Then perform actual sign out in background
+      console.log('Starting sign out...');
+      
+      // Perform actual sign out first
       const { error } = await supabase.auth.signOut();
       if (error) {
-        console.error('Sign out error (non-blocking):', error);
-        // Don't throw - user is already logged out from UI perspective
+        console.error('Sign out error:', error);
       }
+      
+      // Clear only skipWorkspace, keep currentWorkspace so user returns to their workspace on re-login
+      localStorage.removeItem('skipWorkspace');
+      // DON'T clear currentWorkspace - user is still a member
+      
+      // Clear user state
+      setUser(null);
+      setLoading(false);
+      currentUserIdRef.current = null;
+      
+      console.log('Sign out complete');
+      
+      // Small delay then reload to ensure state is cleared
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 100);
     } catch (error) {
       console.error('Sign out error:', error);
-      // Don't throw - user state is already cleared
-    } finally {
+      // Clear state and reload even on error
+      setUser(null);
       setLoading(false);
+      // Only clear skipWorkspace on error, not currentWorkspace
+      localStorage.removeItem('skipWorkspace');
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 100);
     }
   };
 

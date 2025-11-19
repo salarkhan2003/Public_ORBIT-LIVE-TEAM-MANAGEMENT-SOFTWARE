@@ -9,9 +9,24 @@ export function AuthCallback() {
   const [status, setStatus] = useState<string>('Authenticating...');
 
   useEffect(() => {
+    let mounted = true;
+    let timeoutId: NodeJS.Timeout;
+
     const handleCallback = async () => {
       try {
+        if (!mounted) return;
+        
         setStatus('Verifying your credentials...');
+        console.log('🔐 AuthCallback: Starting authentication...');
+
+        // Add timeout protection
+        timeoutId = setTimeout(() => {
+          if (mounted) {
+            console.error('⏱️ AuthCallback timeout - redirecting to login');
+            toast.error('Authentication timed out. Please try again.');
+            window.location.href = '/';
+          }
+        }, 15000); // 15 second timeout
 
         // Check for error in URL params (OAuth errors)
         const params = new URLSearchParams(window.location.search);
@@ -19,109 +34,110 @@ export function AuthCallback() {
         const errorDescription = params.get('error_description');
 
         if (errorParam) {
-          console.error('OAuth error:', errorParam, errorDescription);
+          console.error('❌ OAuth error:', errorParam, errorDescription);
           const friendlyError = errorDescription || 'Authentication failed. Please try again.';
           toast.error(friendlyError, { duration: 5000 });
           setError(friendlyError);
-          setTimeout(() => navigate('/', { replace: true }), 3000);
+          clearTimeout(timeoutId);
+          setTimeout(() => window.location.href = '/', 2000);
           return;
         }
 
         // Get the session from Supabase
+        console.log('📡 Getting session from Supabase...');
         const { data, error: sessionError } = await supabase.auth.getSession();
 
+        if (!mounted) return;
+
         if (sessionError) {
-          console.error('Error getting session:', sessionError);
+          console.error('❌ Session error:', sessionError);
           toast.error('Authentication failed. Please try again.');
-          setTimeout(() => navigate('/', { replace: true }), 2000);
+          clearTimeout(timeoutId);
+          setTimeout(() => window.location.href = '/', 2000);
           return;
         }
 
         if (!data?.session?.user) {
-          console.log('No session found, redirecting to login');
+          console.log('❌ No session found');
           toast.error('No session found. Please sign in again.');
-          setTimeout(() => navigate('/', { replace: true }), 2000);
+          clearTimeout(timeoutId);
+          setTimeout(() => window.location.href = '/', 2000);
           return;
         }
 
         const user = data.session.user;
-        console.log('User authenticated:', user.id);
-        setStatus('Setting up your profile...');
+        console.log('✅ User authenticated:', user.email);
+        
+        if (!mounted) return;
+        setStatus('Creating your profile...');
 
-        // Check if user profile exists
-        const { data: existingProfile, error: fetchError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', user.id)
-          .maybeSingle();
-
-        if (fetchError && !fetchError.message.includes('no rows')) {
-          console.error('Error checking user profile:', fetchError);
-          toast.error('Failed to verify profile. Please try again.');
-          await supabase.auth.signOut();
-          setTimeout(() => navigate('/', { replace: true }), 2000);
-          return;
-        }
-
-        // If no profile exists, create one
-        if (!existingProfile) {
-          console.log('Creating user profile...');
-          setStatus('Creating your workspace...');
-
-          const profile = {
-            id: user.id,
-            email: user.email || '',
-            name: user.user_metadata?.full_name ||
-                  user.user_metadata?.name ||
-                  user.email?.split('@')[0] ||
-                  'User',
-            avatar: user.user_metadata?.avatar_url ||
-                    user.user_metadata?.picture ||
-                    null,
-            role: 'developer',
-            title: 'Team Member',
-            created_at: new Date().toISOString(),
-          };
-
-          const { error: insertError } = await supabase
+        // Try to create/get profile (non-blocking)
+        try {
+          const { data: existingProfile } = await supabase
             .from('users')
-            .insert([profile]);
+            .select('id')
+            .eq('id', user.id)
+            .maybeSingle();
 
-          if (insertError) {
-            console.error('Error creating user profile:', insertError);
+          if (!existingProfile) {
+            console.log('📝 Creating user profile...');
+            const profile = {
+              id: user.id,
+              email: user.email || '',
+              name: user.user_metadata?.full_name ||
+                    user.user_metadata?.name ||
+                    user.email?.split('@')[0] ||
+                    'User',
+              avatar: user.user_metadata?.avatar_url ||
+                      user.user_metadata?.picture ||
+                      null,
+              role: 'developer',
+              title: 'Team Member',
+              created_at: new Date().toISOString(),
+            };
 
-            // Check if it's a duplicate key error (profile already exists)
-            if (insertError.message.includes('duplicate key') || insertError.code === '23505') {
-              console.log('Profile already exists, continuing...');
-            } else {
-              // Real error - provide helpful message
-              setError('Failed to create profile. Please ensure database is properly configured.');
-              toast.error('Profile creation failed. Check console for details.', { duration: 5000 });
-              await supabase.auth.signOut();
-              setTimeout(() => navigate('/', { replace: true }), 3000);
-              return;
-            }
+            await supabase.from('users').insert([profile]);
+            console.log('✅ Profile created');
+          } else {
+            console.log('✅ Profile exists');
           }
+        } catch (profileError) {
+          console.warn('⚠️ Profile creation failed (non-blocking):', profileError);
+          // Continue anyway - profile can be created later
         }
 
-        setStatus('Success! Redirecting to dashboard...');
-        toast.success('Welcome to ORBIT LIVE TEAM!');
-
-        // Give user a moment to see success message
+        if (!mounted) return;
+        setStatus('Redirecting to dashboard...');
+        
+        clearTimeout(timeoutId);
+        
+        // Redirect immediately
+        console.log('🚀 Redirecting to dashboard...');
+        toast.success('Welcome to ORBIT LIVE!');
+        
+        // Use window.location for clean redirect
         setTimeout(() => {
-          navigate('/dashboard', { replace: true });
-        }, 1000);
+          window.location.href = '/dashboard';
+        }, 500);
 
       } catch (err) {
-        console.error('Unexpected error in auth callback:', err);
-        const errorMsg = err instanceof Error ? err.message : 'An unexpected error occurred';
-        setError(errorMsg);
-        toast.error(errorMsg);
-        setTimeout(() => navigate('/', { replace: true }), 3000);
+        console.error('❌ Unexpected error in auth callback:', err);
+        if (mounted) {
+          const errorMsg = err instanceof Error ? err.message : 'An unexpected error occurred';
+          setError(errorMsg);
+          toast.error(errorMsg);
+          clearTimeout(timeoutId);
+          setTimeout(() => window.location.href = '/', 2000);
+        }
       }
     };
 
     handleCallback();
+
+    return () => {
+      mounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [navigate]);
 
   return (

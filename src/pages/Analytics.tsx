@@ -49,7 +49,7 @@ interface AnalyticsData {
 
 export function Analytics() {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Start with false
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d');
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_activityLogs, _setActivityLogs] = useState<ActivityLog[]>([]);
@@ -63,13 +63,20 @@ export function Analytics() {
 
   useEffect(() => {
     if (currentGroup) {
-      fetchAnalyticsData();
+      const timeout = setTimeout(() => setLoading(false), 3000);
+      fetchAnalyticsData().finally(() => clearTimeout(timeout));
+      return () => clearTimeout(timeout);
+    } else {
+      setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentGroup, timeRange]);
 
   const fetchAnalyticsData = async () => {
-    if (!currentGroup) return;
+    if (!currentGroup) {
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     try {

@@ -12,7 +12,7 @@ import { useNavigate } from 'react-router-dom';
 
 export function Settings() {
   const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'privacy' | 'appearance' | 'workspace'>('profile');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Start with false
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [settings, setSettings] = useState<Record<string, string | boolean | number>>({});
   const [profileData, setProfileData] = useState<Partial<UserType>>({});
@@ -121,6 +121,10 @@ export function Settings() {
       }
 
       toast.success('Profile updated successfully');
+      
+      // Refresh user data by triggering a re-fetch
+      // The useAuth hook will pick up the changes on next render
+      window.location.reload();
     } catch {
       toast.error('Failed to update profile');
     } finally {

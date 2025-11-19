@@ -11,7 +11,7 @@ import { TaskModal } from '../components/Tasks/TaskModal';
 
 export function Tasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Start with false
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [deletingTask, setDeletingTask] = useState<Task | null>(null);
@@ -21,9 +21,13 @@ export function Tasks() {
   const { currentGroup } = useGroup();
 
   const fetchTasks = useCallback(async () => {
-    if (!currentGroup) return;
+    if (!currentGroup) {
+      setLoading(false);
+      return;
+    }
 
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('tasks')
         .select(`
@@ -37,13 +41,13 @@ export function Tasks() {
 
       if (error) {
         console.error('Error fetching tasks:', error);
-        toast.error('Failed to load tasks');
-        setLoading(false);
+        setTasks([]);
         return;
       }
       setTasks(data || []);
-    } catch {
-      toast.error('Failed to load tasks');
+    } catch (error) {
+      console.error('Error in fetchTasks:', error);
+      setTasks([]);
     } finally {
       setLoading(false);
     }
@@ -51,7 +55,11 @@ export function Tasks() {
 
   useEffect(() => {
     if (currentGroup) {
-      fetchTasks();
+      const timeout = setTimeout(() => setLoading(false), 3000);
+      fetchTasks().finally(() => clearTimeout(timeout));
+      return () => clearTimeout(timeout);
+    } else {
+      setLoading(false);
     }
   }, [currentGroup, fetchTasks]);
 

@@ -16,6 +16,9 @@ export function GroupJoin() {
   const { signOut } = useAuth();
 
   const handleLogout = async () => {
+    const confirmed = window.confirm('Are you sure you want to log out?');
+    if (!confirmed) return;
+
     try {
       await signOut();
       localStorage.removeItem('currentWorkspace');
@@ -37,34 +40,51 @@ export function GroupJoin() {
     setLoading(true);
     console.log('🔄 Starting join group process with code:', joinCode);
 
+    // Add timeout to prevent infinite loading
+    const timeout = setTimeout(() => {
+      console.warn('Join timeout - forcing loading to stop');
+      setLoading(false);
+      toast.error('Join request timed out. Please try again.');
+    }, 10000); // 10 second timeout
+
     try {
       const result = await joinGroup(joinCode.toUpperCase().trim());
+      clearTimeout(timeout);
       console.log('✅ Join successful, group returned:', result);
+
+      if (!result) {
+        throw new Error('No workspace found with that code');
+      }
 
       // Show success message
       toast.success('Successfully joined workspace!');
+
+      // Stop loading
+      setLoading(false);
 
       // Small delay to show success message, then redirect
       console.log('🚀 Redirecting to dashboard...');
       setTimeout(() => {
         window.location.href = '/dashboard';
       }, 500);
-
     } catch (error: any) {
+      clearTimeout(timeout);
       console.error('❌ Join error:', error);
-
-      // Ensure loading is stopped on error
       setLoading(false);
 
       // Better error messages
-      let errorMessage = 'Failed to join workspace';
+      let errorMessage = 'Workspace not found. Please check the code and try again.';
 
-      if (error.message?.includes('Invalid group code')) {
-        errorMessage = 'Invalid join code. Please check and try again.';
+      if (error.message?.includes('Invalid group code') || error.message?.includes('No workspace found')) {
+        errorMessage = 'Workspace not found. Please check the code and try again.';
       } else if (error.message?.includes('already a member')) {
-        errorMessage = 'You are already a member of another workspace.';
+        errorMessage = 'You are already a member of this workspace!';
+        // If already a member, redirect to dashboard
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 1500);
       } else if (error.message?.includes('infinite recursion')) {
-        errorMessage = 'Database error. Please run the FIX_INFINITE_RECURSION_GROUP_MEMBERS.sql script in Supabase.';
+        errorMessage = 'Database error. Please contact support.';
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -82,12 +102,16 @@ export function GroupJoin() {
 
     setLoading(true);
     console.log('🔄 Creating workspace...');
+    let redirecting = false;
 
     try {
       const group = await createGroup(groupName, groupDescription);
       console.log('✅ Workspace created:', group);
       setCreatedGroup(group);
       toast.success('Workspace created successfully!');
+      // Stop loading so buttons re-enable on success screen
+      setLoading(false);
+      redirecting = true;
     } catch (error: any) {
       console.error('❌ Create error:', error);
 
@@ -103,7 +127,10 @@ export function GroupJoin() {
       }
 
       toast.error(errorMessage);
-      setLoading(false);
+    } finally {
+      if (!redirecting) {
+        setLoading(false);
+      }
     }
   };
 
