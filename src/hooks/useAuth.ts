@@ -3,16 +3,22 @@ import { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { User } from '../types';
 
+// Global state to persist across component remounts
+let globalUser: User | null = null;
+let globalInitialized = false;
+
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const initializedRef = useRef(false);
+  const [user, setUser] = useState<User | null>(globalUser);
+  const [loading, setLoading] = useState(!globalInitialized);
+  const initializedRef = useRef(globalInitialized);
   const currentUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     // Prevent double initialization in React 18 Strict Mode
-    if (initializedRef.current) {
-      console.log('Auth already initialized, skipping');
+    if (initializedRef.current && globalInitialized) {
+      console.log('Auth already initialized globally, using cached state');
+      setUser(globalUser);
+      setLoading(false);
       return;
     }
 
@@ -22,6 +28,14 @@ export function useAuth() {
 
     const init = async () => {
       try {
+        // If we have global user, use it immediately
+        if (globalUser && globalInitialized) {
+          console.log('Using cached global user:', globalUser.email);
+          setUser(globalUser);
+          setLoading(false);
+          return;
+        }
+
         setLoading(true);
         console.log('Initializing auth...');
 
@@ -30,7 +44,9 @@ export function useAuth() {
           console.log('Auth initialization timeout - forcing loading to false');
           if (mounted) {
             setLoading(false);
-            setUser(null);
+            if (!globalUser) {
+              setUser(null);
+            }
           }
         }, 5000); // 5 second timeout
 
@@ -41,8 +57,16 @@ export function useAuth() {
         
         if (sessionError) {
           console.error('Session error:', sessionError);
+          // Don't sign out immediately - might be temporary network issue
+          console.warn('Session error detected, but keeping user logged in if we have cached state');
+          if (globalUser) {
+            setUser(globalUser);
+            setLoading(false);
+            return;
+          }
           await supabase.auth.signOut();
           setUser(null);
+          globalUser = null;
           setLoading(false);
           return;
         }
@@ -55,15 +79,19 @@ export function useAuth() {
         const currentUser = sessionData?.session?.user ?? null;
         if (currentUser) {
           console.log('User session found:', currentUser.email);
-          setUser({
+          const userObj = {
             id: currentUser.id,
             email: currentUser.email || '',
             name: currentUser.email?.split('@')[0] || 'User',
             role: 'developer',
             title: 'Team Member',
             created_at: new Date().toISOString()
-          } as User);
-          setLoading(false); // Set loading false immediately
+          } as User;
+          
+          setUser(userObj);
+          globalUser = userObj; // Cache globally
+          globalInitialized = true;
+          setLoading(false);
 
           try {
             await fetchOrCreateUserProfile(currentUser);
@@ -76,15 +104,20 @@ export function useAuth() {
           const fetchedUser = userResp?.data?.user ?? null;
           if (fetchedUser) {
             console.log('User found:', fetchedUser.email);
-            setUser({
+            const userObj = {
               id: fetchedUser.id,
               email: fetchedUser.email || '',
               name: fetchedUser.email?.split('@')[0] || 'User',
               role: 'developer',
               title: 'Team Member',
               created_at: new Date().toISOString()
-            } as User);
-            setLoading(false); // Set loading false immediately
+            } as User;
+            
+            setUser(userObj);
+            globalUser = userObj; // Cache globally
+            globalInitialized = true;
+            setLoading(false);
+            
             try {
               await fetchOrCreateUserProfile(fetchedUser);
             } catch (profileError) {
@@ -93,14 +126,22 @@ export function useAuth() {
           } else {
             console.log('No user found - user is logged out');
             setUser(null);
-            setLoading(false); // Set loading false for no user
+            globalUser = null;
+            globalInitialized = true;
+            setLoading(false);
           }
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
         if (mounted) {
-          setUser(null);
-          setLoading(false); // Always set loading false on error
+          // Keep cached user if available
+          if (globalUser) {
+            console.warn('Error during auth init, but keeping cached user');
+            setUser(globalUser);
+          } else {
+            setUser(null);
+          }
+          setLoading(false);
         }
       }
     };
@@ -120,6 +161,8 @@ export function useAuth() {
         if (event === 'SIGNED_OUT') {
           console.log('User signed out');
           setUser(null);
+          globalUser = null;
+          globalInitialized = false;
           currentUserIdRef.current = null;
           setLoading(false);
           return;
@@ -136,15 +179,20 @@ export function useAuth() {
           // Handle email confirmation
           if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
             currentUserIdRef.current = currentUser.id;
-            setUser({
+            const userObj = {
               id: currentUser.id,
               email: currentUser.email || '',
               name: currentUser.email?.split('@')[0] || 'User',
               role: 'developer',
               title: 'Team Member',
               created_at: new Date().toISOString()
-            } as User);
-            setLoading(false); // Set loading false immediately after setting user
+            } as User;
+            
+            setUser(userObj);
+            globalUser = userObj; // Update global cache
+            globalInitialized = true;
+            setLoading(false);
+            
             try {
               await fetchOrCreateUserProfile(currentUser);
             } catch (profileError) {
@@ -153,6 +201,7 @@ export function useAuth() {
           }
         } else {
           setUser(null);
+          globalUser = null;
           currentUserIdRef.current = null;
           setLoading(false);
         }
@@ -171,8 +220,8 @@ export function useAuth() {
     return () => {
       console.log('Auth cleanup');
       mounted = false;
-      // Allow re-initialization (needed for React Strict Mode double-mount)
-      initializedRef.current = false;
+      // DON'T reset initializedRef - keep global state
+      // initializedRef.current = false;
       currentUserIdRef.current = null;
       // Ensure loading is reset on cleanup to prevent stuck loading state
       setLoading(false);
@@ -489,8 +538,10 @@ export function useAuth() {
       localStorage.removeItem('skipWorkspace');
       // DON'T clear currentWorkspace - user is still a member
       
-      // Clear user state
+      // Clear user state (both local and global)
       setUser(null);
+      globalUser = null;
+      globalInitialized = false;
       setLoading(false);
       currentUserIdRef.current = null;
       
@@ -504,6 +555,8 @@ export function useAuth() {
       console.error('Sign out error:', error);
       // Clear state and reload even on error
       setUser(null);
+      globalUser = null;
+      globalInitialized = false;
       setLoading(false);
       // Only clear skipWorkspace on error, not currentWorkspace
       localStorage.removeItem('skipWorkspace');
