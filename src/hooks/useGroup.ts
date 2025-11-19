@@ -39,6 +39,12 @@ export function useGroup(authReady: boolean = true) {
     try {
       console.log('🔄 Fetching members for group:', groupId);
 
+      if (!groupId) {
+        console.error('❌ No groupId provided to fetchGroupMembers');
+        setGroupMembers([]);
+        return;
+      }
+
       // Simple query - get member IDs first (MUST include id, joined_at for proper React keys)
       const { data: memberData, error: memberError } = await supabase
         .from('group_members')
@@ -47,20 +53,26 @@ export function useGroup(authReady: boolean = true) {
 
       if (memberError) {
         console.error('❌ Error fetching group members:', memberError);
+        console.error('Error details:', {
+          code: memberError.code,
+          message: memberError.message,
+          details: memberError.details
+        });
         setGroupMembers([]);
         return;
       }
 
       if (!memberData || memberData.length === 0) {
-        console.log('ℹ️ No members found for group');
+        console.log('ℹ️ No members found for group:', groupId);
         setGroupMembers([]);
         return;
       }
 
-      console.log('📊 Found', memberData.length, 'member records');
+      console.log('📊 Found', memberData.length, 'member records:', memberData);
 
       // Then fetch user details separately
       const userIds = memberData.map(m => m.user_id);
+      console.log('👥 Fetching user profiles for IDs:', userIds);
 
       const { data: userDataResult, error: userError } = await supabase
         .from('users')
@@ -80,12 +92,13 @@ export function useGroup(authReady: boolean = true) {
             created_at: new Date().toISOString()
           }
         }));
+        console.log('⚠️ Setting members without user profiles:', membersWithoutUsers.length);
         setGroupMembers(membersWithoutUsers as GroupMember[]);
         return;
       }
 
       const userData = userDataResult || [];
-      console.log('✅ Fetched', userData.length, 'user profiles');
+      console.log('✅ Fetched', userData.length, 'user profiles:', userData);
 
       // Combine the data - ALWAYS create member objects
       const members = memberData.map(member => {
@@ -103,7 +116,7 @@ export function useGroup(authReady: boolean = true) {
         };
       });
 
-      console.log('✅ Setting', members.length, 'members with profiles');
+      console.log('✅ Setting', members.length, 'members with profiles:', members);
       setGroupMembers(members as GroupMember[]);
     } catch (error) {
       console.error('❌ Error in fetchGroupMembers:', error);
@@ -572,17 +585,26 @@ export function useGroup(authReady: boolean = true) {
   const refreshGroupSilent = useCallback(async () => {
     // Refresh without showing loading screen
     try {
+      console.log('🔄 Refreshing group silently...');
       const userResp = await supabase.auth.getUser();
       const user = userResp?.data?.user ?? null;
 
-      if (!user || !currentGroup) {
+      if (!user) {
+        console.log('❌ No user found, cannot refresh');
         return;
       }
 
+      if (!currentGroup) {
+        console.log('❌ No current group, cannot refresh');
+        return;
+      }
+
+      console.log('✅ Refreshing members for group:', currentGroup.id, currentGroup.name);
       // Fetch members without setting loading state
       await fetchGroupMembers(currentGroup.id);
+      console.log('✅ Refresh complete');
     } catch (error) {
-      console.error('Error refreshing group:', error);
+      console.error('❌ Error refreshing group:', error);
     }
   }, [currentGroup, fetchGroupMembers]);
 

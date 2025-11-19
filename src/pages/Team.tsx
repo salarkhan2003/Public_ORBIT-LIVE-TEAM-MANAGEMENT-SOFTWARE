@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 import { User } from '../types';
+import React from 'react';
 
 // Predefined role options
 const PREDEFINED_ROLES = [
@@ -40,6 +41,20 @@ export function Team() {
   const currentUserMember = groupMembers.find(m => m.user_id === user?.id);
   const isAdmin = currentUserMember?.role === 'admin';
   const isOwner = currentGroup?.group_owner_id === user?.id;
+
+  // Fetch members when page loads
+  React.useEffect(() => {
+    console.log('Team page mounted');
+    console.log('Current group:', currentGroup?.name);
+    console.log('Group members count:', groupMembers.length);
+    console.log('Group members:', groupMembers);
+
+    // If we have a group but no members, try refreshing
+    if (currentGroup && groupMembers.length === 0 && !loading) {
+      console.log('No members found, triggering refresh...');
+      refreshGroup().catch(err => console.error('Failed to refresh:', err));
+    }
+  }, [currentGroup, groupMembers.length, loading]);
 
   // Show beautiful loading animation while fetching data
   if (loading) {
@@ -277,6 +292,24 @@ export function Team() {
 
       {/* Team Members Grid - Fixed: Keys are unique, no animation delays */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        {groupMembers.length === 0 && !loading && (
+          <div className="col-span-full text-center py-12">
+            <div className="text-6xl mb-4">👥</div>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+              No Team Members Found
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              There are no members in this workspace yet.
+            </p>
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+            >
+              {isRefreshing ? 'Refreshing...' : 'Refresh Members'}
+            </button>
+          </div>
+        )}
         {groupMembers.map((member) => (
           <motion.div
             key={member.id}
@@ -312,11 +345,10 @@ export function Team() {
                   </p>
                 )}
                 <div className="flex items-center space-x-2 flex-wrap gap-1 mt-1">
-                  <span className={`px-3 py-1 text-xs rounded-full font-bold ${
-                    member.role === 'admin' 
-                      ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white'
-                      : 'bg-gradient-to-r from-blue-400 to-cyan-500 text-white'
-                  }`}>
+                  <span className={`px-3 py-1 text-xs rounded-full font-bold ${member.role === 'admin'
+                    ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white'
+                    : 'bg-gradient-to-r from-blue-400 to-cyan-500 text-white'
+                    }`}>
                     {member.role === 'admin' ? 'Admin' : 'Member'}
                   </span>
                   {member.user_id === currentGroup?.group_owner_id && (
@@ -398,11 +430,10 @@ export function Team() {
                   onClick={() => setChangingAdminFor(member)}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  className={`w-full flex items-center justify-center space-x-2 px-3 py-2 text-sm rounded-xl transition-all font-semibold shadow-lg ${
-                    member.role === 'admin'
-                      ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white hover:from-orange-600 hover:to-red-600'
-                      : 'bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600'
-                  }`}
+                  className={`w-full flex items-center justify-center space-x-2 px-3 py-2 text-sm rounded-xl transition-all font-semibold shadow-lg ${member.role === 'admin'
+                    ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white hover:from-orange-600 hover:to-red-600'
+                    : 'bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600'
+                    }`}
                 >
                   <UserCog className="w-4 h-4" />
                   <span>{member.role === 'admin' ? 'Remove Admin' : 'Make Admin'}</span>
@@ -672,9 +703,8 @@ function ToggleAdminModal({ member, onClose, onConfirm }: ToggleAdminModalProps)
         className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-md w-full p-6"
       >
         <div className="flex items-center justify-center mb-4">
-          <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
-            isCurrentlyAdmin ? 'bg-orange-100 dark:bg-orange-900/20' : 'bg-green-100 dark:bg-green-900/20'
-          }`}>
+          <div className={`w-16 h-16 rounded-full flex items-center justify-center ${isCurrentlyAdmin ? 'bg-orange-100 dark:bg-orange-900/20' : 'bg-green-100 dark:bg-green-900/20'
+            }`}>
             {isCurrentlyAdmin ? (
               <Crown className="w-8 h-8 text-orange-600 dark:text-orange-400" />
             ) : (
@@ -694,16 +724,14 @@ function ToggleAdminModal({ member, onClose, onConfirm }: ToggleAdminModalProps)
           }
         </p>
 
-        <div className={`border rounded-xl p-4 mb-6 ${
-          isCurrentlyAdmin 
-            ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800'
-            : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
-        }`}>
-          <p className={`text-sm ${
-            isCurrentlyAdmin 
-              ? 'text-orange-800 dark:text-orange-200'
-              : 'text-green-800 dark:text-green-200'
+        <div className={`border rounded-xl p-4 mb-6 ${isCurrentlyAdmin
+          ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800'
+          : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
           }`}>
+          <p className={`text-sm ${isCurrentlyAdmin
+            ? 'text-orange-800 dark:text-orange-200'
+            : 'text-green-800 dark:text-green-200'
+            }`}>
             <strong>👑 Owner Privilege:</strong> Only the workspace creator can manage admin access for team members.
           </p>
         </div>
@@ -721,11 +749,10 @@ function ToggleAdminModal({ member, onClose, onConfirm }: ToggleAdminModalProps)
             disabled={isChanging}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className={`flex-1 px-6 py-3 text-white rounded-xl disabled:opacity-50 transition-all font-semibold shadow-lg flex items-center justify-center space-x-2 ${
-              isCurrentlyAdmin
-                ? 'bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700'
-                : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700'
-            }`}
+            className={`flex-1 px-6 py-3 text-white rounded-xl disabled:opacity-50 transition-all font-semibold shadow-lg flex items-center justify-center space-x-2 ${isCurrentlyAdmin
+              ? 'bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700'
+              : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700'
+              }`}
           >
             {isChanging ? (
               <>
@@ -956,11 +983,10 @@ function RoleManagementModal({ member, onClose, onUpdate }: RoleManagementModalP
                 onClick={() => handleRoleToggle(role)}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className={`px-3 py-2 text-sm rounded-lg font-semibold transition-all flex items-center justify-center space-x-2 ${
-                  selectedRoles.includes(role) 
-                    ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-md'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
+                className={`px-3 py-2 text-sm rounded-lg font-semibold transition-all flex items-center justify-center space-x-2 ${selectedRoles.includes(role)
+                  ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-md'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
               >
                 <span>{role}</span>
                 {selectedRoles.includes(role) && <Check className="w-4 h-4" />}
