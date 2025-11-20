@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, Clock, AlertTriangle, Flag, User } from 'lucide-react';
+import { Calendar, Clock, Flag, User } from 'lucide-react';
 import { format, isToday, isTomorrow, differenceInDays } from 'date-fns';
 
 interface Deadline {

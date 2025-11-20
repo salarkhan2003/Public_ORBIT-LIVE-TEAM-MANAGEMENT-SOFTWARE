@@ -290,7 +290,7 @@ export function mergeConflicts<T extends Record<string, any>>(
 
   // For each local change, check if it conflicts with remote
   for (const key in local) {
-    if (local.hasOwnProperty(key)) {
+    if (Object.prototype.hasOwnProperty.call(local, key)) {
       const baseValue = base[key];
       const localValue = local[key];
       const remoteValue = remote[key];

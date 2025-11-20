@@ -5,6 +5,7 @@ import React from 'react';
 /**
  * Initialize Sentry for error tracking
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function initSentry() {
   const dsn = import.meta.env.VITE_SENTRY_DSN;
   const environment = import.meta.env.MODE;
@@ -82,6 +83,7 @@ export function initSentry() {
 /**
  * Set user context for error tracking
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function setUserContext(user: {
   id: string;
   email: string;
@@ -99,6 +101,7 @@ export function setUserContext(user: {
 /**
  * Clear user context (on logout)
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function clearUserContext() {
   Sentry.setUser(null);
 }
@@ -106,6 +109,7 @@ export function clearUserContext() {
 /**
  * Add custom context
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function addContext(key: string, value: Record<string, unknown>) {
   Sentry.setContext(key, value);
 }
@@ -113,6 +117,7 @@ export function addContext(key: string, value: Record<string, unknown>) {
 /**
  * Capture custom error
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function captureError(
   error: Error,
   context?: {
@@ -131,6 +136,7 @@ export function captureError(
 /**
  * Capture custom message
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function captureMessage(
   message: string,
   level: 'fatal' | 'error' | 'warning' | 'info' | 'debug' = 'info',
@@ -149,6 +155,7 @@ export function captureMessage(
 /**
  * Add breadcrumb for debugging
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function addBreadcrumb(
   message: string,
   category: string,
@@ -167,6 +174,7 @@ export function addBreadcrumb(
 /**
  * Performance monitoring
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function startTransaction(name: string, operation: string) {
   return Sentry.startSpan({
     name,
@@ -184,6 +192,7 @@ export const ErrorBoundary = Sentry.ErrorBoundary;
 /**
  * HOC for error boundaries
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function withErrorBoundary<P extends object>(
   Component: React.ComponentType<P>,
   fallbackComponent?: React.ComponentType<{ error: Error; resetError: () => void }>

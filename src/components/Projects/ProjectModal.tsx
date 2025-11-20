@@ -130,7 +130,7 @@ export function ProjectModal({ isOpen, onClose, project, onSuccess }: ProjectMod
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
       toast.success('Download started!');
-    } catch (error) {
+    } catch {
       toast.error('Failed to download document');
     }
   };

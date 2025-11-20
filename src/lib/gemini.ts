@@ -1,12 +1,22 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const API_KEY = 'AIzaSyCZ3XGzKPYWP8cjWWwVv2AzmuE7a2Arw50';
+// Load API key from environment variable
+const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
 
-const genAI = new GoogleGenerativeAI(API_KEY);
+if (!API_KEY) {
+  console.error('Missing Google Gemini API key. AI features will not work.');
+}
 
-export const geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
+
+export const geminiModel = genAI ? genAI.getGenerativeModel({ model: 'gemini-2.0-flash' }) : null;
 
 export async function generateTaskSummary(tasks: any[]): Promise<string> {
+  // Check if Gemini is available
+  if (!geminiModel) {
+    return getAIUnavailableMessage();
+  }
+  
   try {
     if (!tasks || tasks.length === 0) {
       return `TEAM STATUS OVERVIEW:
@@ -109,6 +119,13 @@ The AI assistant will be back online shortly to provide detailed insights.`;
 }
 
 export async function parseNaturalLanguageCommand(command: string): Promise<any> {
+  if (!geminiModel) {
+    return { 
+      action: 'other', 
+      response: 'AI assistant is currently unavailable. Please check your API configuration.'
+    };
+  }
+  
   try {
     const prompt = `
       Parse this natural language command into a structured action object:
@@ -148,6 +165,10 @@ export async function parseNaturalLanguageCommand(command: string): Promise<any>
 }
 
 export async function generateWeeklyReport(projects: any[], tasks: any[]): Promise<string> {
+  if (!geminiModel) {
+    return getAIUnavailableMessage();
+  }
+  
   try {
     const prompt = `
       Generate a professional weekly status report based on this data:
@@ -213,6 +234,10 @@ Contact your team lead for detailed analysis.`;
 }
 
 export async function generateProjectSuggestions(userInput: string, teamData: any): Promise<string[]> {
+  if (!geminiModel) {
+    return getDefaultSuggestions();
+  }
+  
   try {
     const prompt = `
       Based on this user input: "${userInput}"
@@ -243,6 +268,10 @@ export async function generateProjectSuggestions(userInput: string, teamData: an
 }
 
 export async function generateSmartResponse(userMessage: string, teamData: any): Promise<string> {
+  if (!geminiModel) {
+    return getDefaultSmartResponse();
+  }
+  
   try {
     const prompt = `
       You are ORBIT LIVE TEAM, an intelligent team management assistant. 
@@ -289,4 +318,61 @@ What would you like to work on today? Try asking me something like:
 
 Let me know how I can help boost your team's productivity!`;
   }
+}
+
+// Helper functions for when AI is unavailable
+function getAIUnavailableMessage(): string {
+  return `AI INSIGHTS TEMPORARILY UNAVAILABLE
+
+CURRENT STATUS:
+Unable to connect to AI service at the moment. Here's what you can do:
+
+MANUAL REVIEW:
+- Check task completion rates
+- Review upcoming deadlines  
+- Identify overdue items
+- Monitor team workload distribution
+
+IMMEDIATE ACTIONS:
+1. Review pending tasks and priorities
+2. Check for any blocked or overdue items
+3. Ensure team members have clear assignments
+4. Schedule check-ins for complex projects
+
+PRODUCTIVITY TIPS:
+- Break large tasks into smaller chunks
+- Set realistic deadlines
+- Communicate regularly with team
+- Use project milestones to track progress
+
+The AI assistant will be back online shortly to provide detailed insights.`;
+}
+
+function getDefaultSuggestions(): string[] {
+  return [
+    "What tasks are assigned to me?",
+    "Show me this week's deadlines",
+    "What's our team's progress?",
+    "Create a new task",
+    "Schedule a team meeting"
+  ];
+}
+
+function getDefaultSmartResponse(): string {
+  return `I'm here to help you manage your team more effectively! 
+
+I can assist you with:
+• Creating and tracking tasks and projects
+• Analyzing team performance and productivity
+• Scheduling meetings and deadlines
+• Generating reports and insights
+• Organizing documents and resources
+
+What would you like to work on today? Try asking me something like:
+- "What tasks are due this week?"
+- "Show me our team's progress"
+- "Create a new project"
+- "Schedule a team meeting"
+
+Let me know how I can help boost your team's productivity!`;
 }

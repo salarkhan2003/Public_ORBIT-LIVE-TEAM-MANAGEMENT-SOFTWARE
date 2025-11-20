@@ -54,6 +54,7 @@ export function Team() {
       console.log('No members found, triggering refresh...');
       refreshGroup().catch(err => console.error('Failed to refresh:', err));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentGroup, groupMembers.length, loading]);
 
   // Show beautiful loading animation while fetching data

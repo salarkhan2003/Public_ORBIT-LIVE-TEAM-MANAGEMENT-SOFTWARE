@@ -20,6 +20,7 @@ export function AIInsights() {
     if (currentGroup) {
       loadInsights();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentGroup]);
 
   const loadInsights = async () => {
@@ -39,12 +40,6 @@ export function AIInsights() {
 
       if (tasksError) throw tasksError;
 
-      const { data: projects, error: projectsError } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('group_id', currentGroup!.id);
-
-      if (projectsError) throw projectsError;
 
       // Calculate real metrics
       const completedTasks = tasks?.filter(t => t.status === 'done').length || 0;

@@ -1,5 +1,4 @@
 // Tests for Authentication Middleware
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /// <reference types="jest" />
 import { Response } from 'express';
 import { authenticate, requireRole, requireWorkspaceMember } from '../auth';
