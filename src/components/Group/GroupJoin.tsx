@@ -21,12 +21,20 @@ export function GroupJoin() {
 
     try {
       await signOut();
+      // Clear all auth-related localStorage items
+      localStorage.removeItem('skipWorkspace');
+      localStorage.removeItem('demoMode');
       localStorage.removeItem('currentWorkspace');
       toast.success('Logged out successfully');
       window.location.href = '/';
     } catch (error) {
-      toast.error('Failed to logout');
       console.error('Logout error:', error);
+      // Even on error, clear localStorage and redirect
+      localStorage.removeItem('skipWorkspace');
+      localStorage.removeItem('demoMode');
+      localStorage.removeItem('currentWorkspace');
+      toast.success('Logged out successfully');
+      window.location.href = '/';
     }
   };
 

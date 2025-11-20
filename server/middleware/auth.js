@@ -39,6 +39,7 @@ export async function authenticate(req, res, next) {
         const { data: { user }, error } = await supabase.auth.getUser(token);
 
         if (error || !user) {
+            // Return 401 for authentication errors, not 500
             res.status(401).json({
                 error: 'Unauthorized',
                 message: 'Invalid or expired token',

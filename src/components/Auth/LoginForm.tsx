@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, Zap, Users, BarChart3, Clock, Shield, Sparkles, CheckCircle2, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, Zap, Users, BarChart3, Clock, Shield, Sparkles, CheckCircle2, ArrowRight, ArrowLeft, Play } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useDemoMode } from '../../hooks/useDemoMode';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FeaturesTrain } from './FeaturesTrain';
@@ -59,6 +60,7 @@ export function LoginForm({ onBackToLanding }: LoginFormProps) {
 	const [loading, setLoading] = useState(false);
 	const [googleLoading, setGoogleLoading] = useState(false);
 	const { signIn, signUp, signInWithGoogle } = useAuth();
+	const { activateDemoMode } = useDemoMode();
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -475,7 +477,7 @@ export function LoginForm({ onBackToLanding }: LoginFormProps) {
 									)}
 								</motion.button>
 
-								<div className="text-center pt-2">
+								<div className="flex flex-col space-y-3 pt-2">
 									<button
 										type="button"
 										onClick={toggleMode}
@@ -487,6 +489,36 @@ export function LoginForm({ onBackToLanding }: LoginFormProps) {
 											{isLogin ? 'Sign up' : 'Sign in'}
 										</span>
 									</button>
+									
+									<div className="relative my-2">
+										<div className="absolute inset-0 flex items-center">
+											<div className="w-full border-t border-gray-600" />
+										</div>
+										<div className="relative flex justify-center text-sm">
+											<span className="px-3 bg-gray-800/50 text-gray-400">
+												Or
+											</span>
+										</div>
+									</div>
+									
+									<button
+										type="button"
+										onClick={() => {
+											// Clear any existing auth state before activating demo mode
+											localStorage.removeItem('skipWorkspace');
+											localStorage.removeItem('demoMode');
+											localStorage.removeItem('currentWorkspace');
+											activateDemoMode();
+											window.location.href = '/dashboard';
+										}}
+										className="w-full flex items-center justify-center gap-2 py-3 px-4 border border-gray-600 rounded-xl bg-gradient-to-r from-purple-600/20 to-indigo-600/20 hover:from-purple-600/30 hover:to-indigo-600/30 text-white font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
+									>
+										<Play className="w-5 h-5" />
+										<span>Explore Demo Workspace</span>
+									</button>
+									<p className="text-xs text-center text-gray-500">
+										No signup required. Fully functional demo.
+									</p>
 								</div>
 							</form>
 						</div>

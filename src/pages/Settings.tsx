@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Settings as SettingsIcon, User, Bell, Shield, Palette, Save, Eye, EyeOff, LogOut, Users as UsersIcon, Check } from 'lucide-react';
+import { Settings as SettingsIcon, User, Bell, Shield, Palette, Save, Eye, EyeOff, LogOut, Users as UsersIcon, Check, LogIn } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { User as UserType } from '../types';
 import { useAuth } from '../hooks/useAuth';
+import { useDemoMode } from '../hooks/useDemoMode';
 import { useTheme } from '../hooks/useTheme';
 import { useGroup } from '../hooks/useGroup';
 import { LoadingAnimation } from '../components/Shared/LoadingAnimation';
@@ -25,6 +26,7 @@ export function Settings() {
   });
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { user } = useAuth();
+  const { isDemoMode, demoUser } = useDemoMode();
   const { isDark, toggleTheme } = useTheme();
   const { currentGroup, leaveGroup, refreshGroup } = useGroup();
   const navigate = useNavigate();
@@ -55,12 +57,12 @@ export function Settings() {
   }, [user]);
 
   useEffect(() => {
-    if (user) {
+    if (user || isDemoMode) {
       fetchSettings();
-      setProfileData(user);
+      setProfileData(isDemoMode ? (demoUser as Partial<UserType>) : user || {});
       setLoading(false);
     }
-  }, [user, fetchSettings]);
+  }, [user, isDemoMode, demoUser, fetchSettings]);
 
   const updateSetting = async (key: string, value: string | boolean | number, type: 'notifications' | 'privacy' | 'theme') => {
     if (!user) return;
@@ -752,6 +754,39 @@ export function Settings() {
                           >
                             <UsersIcon className="w-4 h-4" />
                             <span>Create Workspace</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-xl p-6 border border-purple-200 dark:border-purple-800">
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center">
+                          <LogIn className="w-5 h-5 mr-2 text-purple-600 dark:text-purple-400" />
+                          Authentication Options
+                        </h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                          Sign in or create an account to unlock all features and save your progress.
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-3">
+                          <button
+                            onClick={() => {
+                              localStorage.removeItem('skipWorkspace');
+                              localStorage.removeItem('demoMode');
+                              localStorage.removeItem('currentWorkspace');
+                              window.location.href = '/';
+                            }}
+                            className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-2 rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all flex items-center justify-center space-x-2 font-semibold"
+                          >
+                            <LogIn className="w-4 h-4" />
+                            <span>Sign In / Sign Up</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              localStorage.setItem('skipWorkspace', 'true');
+                              toast.success('You can sign in later from the Profile tab');
+                            }}
+                            className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center justify-center space-x-2 font-semibold"
+                          >
+                            <span>Sign In Later</span>
                           </button>
                         </div>
                       </div>

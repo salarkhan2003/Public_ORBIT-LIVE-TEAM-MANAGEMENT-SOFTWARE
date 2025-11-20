@@ -1,11 +1,15 @@
 // Tests for Authentication Middleware
-/// <reference types="jest" />
+import { vi, Mock } from 'vitest';
 import { Response } from 'express';
 import { authenticate, requireRole, requireWorkspaceMember } from '../auth';
 import { createClient } from '@supabase/supabase-js';
 
+// Mock environment variables
+process.env.SUPABASE_URL = 'https://test.supabase.co';
+process.env.SUPABASE_ANON_KEY = 'test-key';
+
 // Mock Supabase
-jest.mock('@supabase/supabase-js');
+vi.mock('@supabase/supabase-js');
 
 // Define MockAuthRequest to match our middleware (avoiding name collision)
 interface MockAuthRequest {
@@ -23,16 +27,8 @@ interface MockAuthRequest {
 describe('Authentication Middleware', () => {
   let mockRequest: Partial<MockAuthRequest>;
   let mockResponse: Partial<Response>;
-  let mockNext: jest.Mock;
-  let mockSupabase: {
-    auth: {
-      getUser: jest.Mock;
-    };
-    from: jest.Mock;
-    select: jest.Mock;
-    eq: jest.Mock;
-    single: jest.Mock;
-  };
+  let mockNext: Mock;
+  let mockSupabase: any;
 
   beforeEach(() => {
     mockRequest = {
@@ -40,22 +36,22 @@ describe('Authentication Middleware', () => {
       user: undefined,
     };
     mockResponse = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn().mockReturnThis(),
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
     };
-    mockNext = jest.fn();
+    mockNext = vi.fn();
 
     mockSupabase = {
       auth: {
-        getUser: jest.fn(),
+        getUser: vi.fn(),
       },
-      from: jest.fn().mockReturnThis(),
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      single: jest.fn(),
+      from: vi.fn().mockReturnThis(),
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn(),
     };
 
-    (createClient as jest.Mock).mockReturnValue(mockSupabase);
+    (createClient as Mock).mockReturnValue(mockSupabase);
   });
 
   describe('authenticate', () => {
@@ -121,6 +117,9 @@ describe('Authentication Middleware', () => {
         data: { user: mockUser },
         error: null,
       });
+      mockSupabase.from.mockReturnThis();
+      mockSupabase.select.mockReturnThis();
+      mockSupabase.eq.mockReturnThis();
       mockSupabase.single.mockResolvedValue({
         data: mockProfile,
         error: null,
@@ -214,6 +213,9 @@ describe('Authentication Middleware', () => {
       mockRequest.params = { workspaceId: 'workspace-123' };
       mockRequest.supabase = mockSupabase;
 
+      mockSupabase.from.mockReturnThis();
+      mockSupabase.select.mockReturnThis();
+      mockSupabase.eq.mockReturnThis();
       mockSupabase.single.mockResolvedValue({
         data: null,
         error: new Error('Not found'),
@@ -234,6 +236,9 @@ describe('Authentication Middleware', () => {
       mockRequest.params = { workspaceId: 'workspace-123' };
       mockRequest.supabase = mockSupabase;
 
+      mockSupabase.from.mockReturnThis();
+      mockSupabase.select.mockReturnThis();
+      mockSupabase.eq.mockReturnThis();
       mockSupabase.single.mockResolvedValue({
         data: { role: 'member' },
         error: null,

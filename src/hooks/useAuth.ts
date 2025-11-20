@@ -534,9 +534,10 @@ export function useAuth() {
         console.error('Sign out error:', error);
       }
       
-      // Clear only skipWorkspace, keep currentWorkspace so user returns to their workspace on re-login
+      // Clear all auth-related localStorage items
       localStorage.removeItem('skipWorkspace');
-      // DON'T clear currentWorkspace - user is still a member
+      localStorage.removeItem('demoMode');
+      localStorage.removeItem('currentWorkspace');
       
       // Clear user state (both local and global)
       setUser(null);
@@ -547,22 +548,21 @@ export function useAuth() {
       
       console.log('Sign out complete');
       
-      // Small delay then reload to ensure state is cleared
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 100);
+      // Redirect to login page
+      window.location.href = '/';
     } catch (error) {
       console.error('Sign out error:', error);
-      // Clear state and reload even on error
+      // Clear state and redirect even on error
       setUser(null);
       globalUser = null;
       globalInitialized = false;
       setLoading(false);
-      // Only clear skipWorkspace on error, not currentWorkspace
+      // Clear all auth-related localStorage items
       localStorage.removeItem('skipWorkspace');
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 100);
+      localStorage.removeItem('demoMode');
+      localStorage.removeItem('currentWorkspace');
+      // Redirect to login page
+      window.location.href = '/';
     }
   };
 

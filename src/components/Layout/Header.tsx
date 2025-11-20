@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Menu, Search, Bell, Moon, Sun, LogOut, User } from 'lucide-react';
+import { Menu, Search, Bell, Moon, Sun, LogOut, User, LogIn } from 'lucide-react';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../hooks/useAuth';
+import { useDemoMode } from '../../hooks/useDemoMode';
 import { useNotificationContext } from '../../context/NotificationContext';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -14,6 +15,7 @@ interface HeaderProps {
 export function Header({ onMenuClick }: HeaderProps) {
   const { isDark, toggleTheme } = useTheme();
   const { user, signOut } = useAuth();
+  const { isDemoMode, deactivateDemoMode } = useDemoMode();
   const { unreadCount } = useNotificationContext();
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -178,18 +180,34 @@ export function Header({ onMenuClick }: HeaderProps) {
                     </div>
 
                     <div className="p-2">
-                      <motion.button
-                        whileHover={{ scale: 1.02, x: 4 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => {
-                          setShowUserMenu(false);
-                          navigate('/settings');
-                        }}
-                        className="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50 dark:hover:from-indigo-900/20 dark:hover:to-purple-900/20 rounded-xl transition-all touch-manipulation"
-                      >
-                        <User className="w-5 h-5" />
-                        <span className="font-medium">Profile Settings</span>
-                      </motion.button>
+                      {isDemoMode ? (
+                        <motion.button
+                          whileHover={{ scale: 1.02, x: 4 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => {
+                            setShowUserMenu(false);
+                            deactivateDemoMode();
+                            window.location.href = '/auth';
+                          }}
+                          className="w-full flex items-center space-x-3 px-4 py-3 text-sm text-blue-600 dark:text-blue-400 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 dark:hover:from-blue-900/20 dark:hover:to-indigo-900/20 rounded-xl transition-all touch-manipulation"
+                        >
+                          <LogIn className="w-5 h-5" />
+                          <span className="font-medium">Sign In/Sign Up</span>
+                        </motion.button>
+                      ) : (
+                        <motion.button
+                          whileHover={{ scale: 1.02, x: 4 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => {
+                            setShowUserMenu(false);
+                            navigate('/settings');
+                          }}
+                          className="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50 dark:hover:from-indigo-900/20 dark:hover:to-purple-900/20 rounded-xl transition-all touch-manipulation"
+                        >
+                          <User className="w-5 h-5" />
+                          <span className="font-medium">Profile Settings</span>
+                        </motion.button>
+                      )}
 
                       <motion.button
                         whileHover={{ scale: 1.02, x: 4 }}

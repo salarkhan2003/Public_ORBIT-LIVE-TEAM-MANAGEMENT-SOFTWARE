@@ -14,6 +14,7 @@ import { Contact } from './pages/Contact';
 import { FullPageLoader } from './components/Shared/LoadingAnimation';
 import { useAuth } from './hooks/useAuth';
 import { useGroup } from './hooks/useGroup';
+import { useDemoMode } from './hooks/useDemoMode';
 import { Dashboard } from './pages/Dashboard';
 import { Projects } from './pages/Projects';
 import { Tasks } from './pages/Tasks';
@@ -28,6 +29,7 @@ import { Settings } from './pages/Settings';
 function App() {
   const { user, loading: authLoading } = useAuth();
   const { currentGroup, loading: groupLoading } = useGroup(!authLoading);
+  const { isDemoMode } = useDemoMode();
   const [showProfileSetup, setShowProfileSetup] = React.useState(false);
   const [showLanding, setShowLanding] = React.useState(true);
   const [forceShowApp, setForceShowApp] = React.useState(false);
@@ -109,15 +111,15 @@ function App() {
     }
   }, [user]);
 
-  // If user is authenticated, don't show landing page
+  // If user is authenticated or in demo mode, don't show landing page
   React.useEffect(() => {
-    if (user) {
-      console.log('✅ User authenticated, hiding landing page');
+    if (user || isDemoMode) {
+      console.log('✅ User authenticated or demo mode, hiding landing page');
       setShowLanding(false);
     } else {
-      console.log('❌ No user, may show landing page');
+      console.log('❌ No user and not in demo mode, may show landing page');
     }
-  }, [user]);
+  }, [user, isDemoMode]);
 
   // Show loading spinner while checking auth (with timeout protection)
   if (authLoading && !forceShowApp) {
@@ -127,8 +129,8 @@ function App() {
   
   console.log('✅ Auth ready, user:', user?.email || 'none', 'forceShowApp:', forceShowApp);
 
-  // User not logged in - show landing page or login
-  if (!user) {
+  // User not logged in and not in demo mode - show landing page or login
+  if (!user && !isDemoMode) {
     return (
       <Router>
         <Routes>
@@ -158,15 +160,15 @@ function App() {
     );
   }
 
-  // User is logged in - show loading while checking workspace (but with timeout protection)
+  // User is logged in or in demo mode - show loading while checking workspace (but with timeout protection)
   // Only show loading if auth is ready and we're actually checking workspace
-  if (groupLoading && !authLoading && !forceShowApp) {
+  if (groupLoading && !authLoading && !forceShowApp && !isDemoMode) {
     console.log('Group loading, showing workspace setup message...');
     return <FullPageLoader message="Setting up your workspace..." />;
   }
   
-  // If auth is still loading, show auth loading message
-  if (authLoading && !forceShowApp) {
+  // If auth is still loading and not in demo mode, show auth loading message
+  if (authLoading && !forceShowApp && !isDemoMode) {
     return <FullPageLoader message="Loading ORBIT LIVE..." />;
   }
 
@@ -186,11 +188,11 @@ function App() {
         {/* Show profile setup if needed */}
         {showProfileSetup ? (
           <Route path="*" element={<ProfileSetup onComplete={() => setShowProfileSetup(false)} />} />
-        ) : !currentGroup && !hasSkippedWorkspace && !hasCachedWorkspace ? (
+        ) : !currentGroup && !hasSkippedWorkspace && !hasCachedWorkspace && !isDemoMode ? (
           /* User needs to join/create a workspace OR can skip */
           <Route path="*" element={<GroupJoin />} />
         ) : (
-          /* User is authenticated (with or without workspace) - show main app */
+          /* User is authenticated (with or without workspace) or in demo mode - show main app */
           <>
             <Route path="/" element={<Layout><Dashboard /></Layout>} />
             <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
