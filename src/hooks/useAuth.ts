@@ -245,33 +245,54 @@ export function useAuth() {
     try {
       console.log('Fetching profile for user:', supabaseUserObj.id);
 
-      // Fetch existing profile - Let Supabase handle timeout internally
-      const { data: existingProfile, error: fetchError } = await supabase
+      // Create basic user object immediately to prevent blocking
+      const basicUser: User = {
+        id: supabaseUserObj.id,
+        email: supabaseUserObj.email || '',
+        name: supabaseUserObj.email?.split('@')[0] || 'User',
+        avatar: undefined,
+        role: 'developer',
+        title: 'Team Member',
+        created_at: new Date().toISOString(),
+      };
+
+      // Set user immediately so app can continue
+      setUser(basicUser);
+
+      // Fetch existing profile with timeout (non-blocking)
+      const fetchPromise = supabase
         .from('users')
         .select('*')
         .eq('id', supabaseUserObj.id)
         .maybeSingle();
 
-      // If error (except no rows), handle gracefully
-      if (fetchError && !fetchError.message.includes('no rows')) {
-        console.error('Error fetching user profile:', fetchError);
-        // Don't throw - create basic user object instead
-        const basicUser: User = {
-          id: supabaseUserObj.id,
-          email: supabaseUserObj.email || '',
-          name: supabaseUserObj.email?.split('@')[0] || 'User',
-          avatar: undefined,
-          role: 'developer',
-          title: 'Team Member',
-          created_at: new Date().toISOString(),
-        };
-        setUser(basicUser);
+      const timeoutPromise = new Promise<null>((_, reject) => {
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 3000);
+      });
+
+      let existingProfile;
+      let fetchError;
+      
+      try {
+        const result = await Promise.race([
+          fetchPromise,
+          timeoutPromise
+        ]);
+        existingProfile = (result as any)?.data;
+        fetchError = (result as any)?.error;
+      } catch (timeoutError) {
+        console.warn('Profile fetch timed out, using basic user');
         return;
       }
 
+      // If error or no profile, keep the basic user
+      if (fetchError) {
+        console.warn('Error fetching user profile (using basic user):', fetchError);
+        return;
+      }
 
       if (existingProfile) {
-        console.log('Profile found:', existingProfile);
+        console.log('Profile found, updating user:', existingProfile);
         setUser(existingProfile as User);
         return;
       }
@@ -298,67 +319,40 @@ export function useAuth() {
 
       console.log('Creating user profile:', profile);
 
-      // Try to insert with better error handling
-      const { data: inserted, error: insertError } = await supabase
+      // Try to insert with timeout (non-blocking)
+      const insertPromise = supabase
         .from('users')
         .insert([profile])
         .select()
         .maybeSingle();
 
-      if (insertError) {
-        console.error('Error inserting user profile:', insertError);
-        console.error('Insert error details:', {
-          code: insertError.code,
-          message: insertError.message,
-          details: insertError.details,
-          hint: insertError.hint
-        });
+      const insertTimeout = new Promise<null>((_, reject) => {
+        setTimeout(() => reject(new Error('Profile insert timeout')), 3000);
+      });
 
-        // If it's a duplicate key error, try to fetch the profile
-        if (insertError.code === '23505' || insertError.message.includes('duplicate key')) {
-          console.log('Profile already exists (duplicate key), fetching...');
-          const { data: refetched, error: refetchError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', supabaseUserObj.id)
-            .maybeSingle();
+      try {
+        const result = await Promise.race([
+          insertPromise,
+          insertTimeout
+        ]);
+        const inserted = (result as any)?.data;
+        const insertError = (result as any)?.error;
 
-          if (refetchError) {
-            throw refetchError;
-          }
-
-          if (refetched) {
-            setUser(refetched as User);
-            return;
-          }
+        if (insertError) {
+          console.warn('Error inserting profile (keeping basic user):', insertError);
+          return;
         }
 
-        // If it's a permissions error, provide a helpful message
-        if (insertError.code === '42501' || insertError.message.includes('permission denied') || insertError.message.includes('policy')) {
-          throw new Error('Database permission error. Please run the FIX_USER_SIGNUP_RLS.sql script in your Supabase SQL Editor to fix RLS policies.');
+        if (inserted) {
+          console.log('User profile created successfully:', inserted);
+          setUser(inserted as User);
         }
-
-        throw insertError;
-      }
-
-      if (inserted) {
-        console.log('User profile created successfully:', inserted);
-        setUser(inserted as User);
+      } catch (timeoutError) {
+        console.warn('Profile insert timed out, keeping basic user');
       }
     } catch (error: unknown) {
-      console.warn('Error in fetchOrCreateUserProfile (non-blocking):', error);
-      // Create fallback user object so app can continue
-      const fallbackUser: User = {
-        id: supabaseUserObj.id,
-        email: supabaseUserObj.email || '',
-        name: supabaseUserObj.email?.split('@')[0] || 'User',
-        avatar: undefined,
-        role: 'developer',
-        title: 'Team Member',
-        created_at: new Date().toISOString(),
-      };
-      setUser(fallbackUser);
-      // Don't throw - let the app continue
+      console.warn('Error in fetchOrCreateUserProfile (using basic user):', error);
+      // User is already set with basic info at the start
     }
   };
 
